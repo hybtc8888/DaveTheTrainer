@@ -1,5 +1,18 @@
 # DaveTheTrainer
 
+<p align="center">
+  <img src="Assets/AppIcon/DaveTheTrainerIcon.png" width="144" alt="DaveTheTrainer app icon">
+</p>
+
+<p align="center">
+  Manifest-backed macOS trainer for <code>DAVE THE DIVER</code>.
+</p>
+
+<p align="center">
+  <a href="README.zh-CN.md">Chinese README</a> ·
+  <a href="https://github.com/Empress7211/DaveTheTrainer/releases/latest">Download latest release</a>
+</p>
+
 DaveTheTrainer is a native macOS trainer for `DAVE THE DIVER`, built as a
 SwiftPM and SwiftUI app with a manifest-backed safety model.
 
@@ -23,6 +36,31 @@ work begins.
 | Manifest schema | `1.0` |
 | Test coverage | XCTest coverage for manifest policy, patch transactions, runtime incrementers, release scripts, and player path contracts |
 | License | MIT |
+
+## Download
+
+Prebuilt app zips are published on
+[GitHub Releases](https://github.com/Empress7211/DaveTheTrainer/releases).
+
+Current release artifacts are ad-hoc signed and not Apple-notarized. macOS may
+show an unidentified-developer warning on first launch. Review the source and
+release notes before running the app.
+
+Install from a release zip:
+
+1. Download `DaveTheTrainer-v0.1.0-macOS.zip` from the latest release.
+2. Unzip it.
+3. Move `DaveTheTrainer.app` to `/Applications` or `$HOME/Applications`.
+4. Start the supported macOS build of `DAVE THE DIVER`.
+5. Open `DaveTheTrainer.app`.
+
+If Gatekeeper blocks the first launch, use Finder's right-click `Open` flow. If
+you intentionally trust the downloaded artifact after reviewing it, you can also
+remove quarantine:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
+```
 
 ## Compatibility Boundary
 
@@ -114,8 +152,9 @@ DAVE_TRAINER_SIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
 
 1. Start the supported macOS build of `DAVE THE DIVER`.
 2. Launch `DaveTheTrainer`.
-3. Use the one-click trainer controls for the supported feature set.
-4. If macOS asks for administrator authorization, review the prompt and allow
+3. Confirm that the app detects the game process and supported build.
+4. Apply only the one-click trainer operation you intend to use.
+5. If macOS asks for administrator authorization, review the prompt and allow
    it only for the trainer attach/read/write operation.
 
 The app should fail loudly when the game is missing, the build is unsupported,
