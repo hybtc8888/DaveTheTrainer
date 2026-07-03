@@ -159,6 +159,16 @@ Run the full test suite before publishing changes:
 swift test
 ```
 
+GitHub Actions runs the public suite and explicitly skips tests that require a
+local `DAVE THE DIVER` installation or extracted proprietary game files:
+
+```bash
+swift test \
+  --skip GameInstallResolverTests \
+  --skip Il2CppFeatureLocatorTests \
+  --skip MachOModuleResolverTests
+```
+
 Feature changes should follow the manifest-first workflow:
 
 1. Document the target feature in `DaveTrainerManifest`.
