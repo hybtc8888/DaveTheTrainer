@@ -1,0 +1,188 @@
+import XCTest
+import TrainerCore
+@testable import DaveTheTrainer
+
+@MainActor
+final class PlayerPathContractTests: XCTestCase {
+    func testDefaultPlayerViewDoesNotExposeDeveloperStaticFeatureControls() throws {
+        let viewSource = try Self.readProjectFile("Sources/DaveTrainerApp/Views/SimpleTrainerView.swift")
+
+        XCTAssertFalse(viewSource.contains("Button(\"特征\")"))
+        XCTAssertFalse(viewSource.contains("refreshStaticFeatures()"))
+    }
+
+    func testQuickPrepareDoesNotRunDeveloperStaticFeatureLocator() throws {
+        let storeSource = try Self.readProjectFile("Sources/DaveTrainerApp/Stores/AppStore.swift")
+        let quickPrepareBody = try Self.functionBody(named: "quickPrepare", in: storeSource)
+
+        XCTAssertFalse(quickPrepareBody.contains("refreshStaticFeatures()"))
+        XCTAssertFalse(quickPrepareBody.contains("locateStaticFeatures"))
+    }
+
+    func testDefaultPlayerOptionsAreManifestBacked() {
+        let manifestIDs = Set(DaveTrainerManifest.current.features.map(\.id.rawValue))
+        let optionIDs = Set(SimpleTrainerOptions.allPlayerOptions.map(\.manifestFeatureID))
+
+        XCTAssertEqual(optionIDs.subtracting(manifestIDs), [])
+    }
+
+    func testDefaultPlayerOptionsDisallowRuntimeScanning() throws {
+        let manifest = DaveTrainerManifest.current
+
+        for option in SimpleTrainerOptions.allPlayerOptions {
+            let featureID = try XCTUnwrap(DaveTrainerFeatureID(rawValue: option.manifestFeatureID))
+            let feature = try XCTUnwrap(manifest.feature(id: featureID))
+            XCTAssertFalse(feature.playerRuntimePolicy.allowRuntimeScanning, option.id)
+        }
+    }
+
+    func testDefaultPlayerActionsDoNotUseLegacyScannerWriteOrFreeze() {
+        let legacyActions = SimpleTrainerOptions.allPlayerOptions.filter { option in
+            switch option.action {
+            case .write, .freeze:
+                return true
+            case .increment, .incrementInventory, .incrementJungleInventory, .patch, .patchGroup, .valuePatch, .unavailable:
+                return false
+            }
+        }
+
+        XCTAssertEqual(legacyActions.map(\.id), [])
+    }
+
+    func testUnsupportedBuildDoesNotMarkPatchEnabled() throws {
+        let memoryAccess = RecordingMemoryAccess()
+        let store = AppStore(dependencies: .test(install: Self.unsupportedInstall, memoryAccess: memoryAccess))
+        let option = try XCTUnwrap(SimpleTrainerOptions.diving.first { $0.id == "god" })
+        var completionResult: Bool?
+
+        store.applySimpleOption(SimpleTrainerActionRequest(
+            option: option,
+            isEnabled: true,
+            valueText: option.defaultValue
+        )) { success in
+            completionResult = success
+        }
+
+        XCTAssertEqual(completionResult, false)
+        XCTAssertFalse(store.isPatchEnabled(id: "god"))
+        XCTAssertEqual(store.latestOperationResult?.state, .unsupportedBuild)
+        XCTAssertTrue(store.latestMessageIsError)
+        XCTAssertEqual(memoryAccess.attachCount, 0)
+    }
+
+    func testRuntimeResourceUnsupportedBuildDoesNotAttachOrWrite() throws {
+        let memoryAccess = RecordingMemoryAccess()
+        let store = AppStore(dependencies: .test(install: Self.unsupportedInstall, memoryAccess: memoryAccess))
+        let option = try XCTUnwrap(SimpleTrainerOptions.currencies.first { $0.id == "money" })
+        var completionResult: Bool?
+
+        store.applySimpleOption(SimpleTrainerActionRequest(
+            option: option,
+            isEnabled: true,
+            valueText: option.defaultValue
+        )) { success in
+            completionResult = success
+        }
+
+        XCTAssertEqual(completionResult, false)
+        XCTAssertEqual(store.latestOperationResult?.state, .unsupportedBuild)
+        XCTAssertTrue(store.latestMessageIsError)
+        XCTAssertEqual(memoryAccess.attachCount, 0)
+    }
+
+    private static var unsupportedInstall: GameInstall {
+        GameInstall(
+            outerAppURL: URL(fileURLWithPath: "/Applications/DaveTheDiver.app", isDirectory: true),
+            innerAppURL: URL(fileURLWithPath: KnownGameBuild.current.executablePath).deletingLastPathComponent(),
+            signature: GameBuildSignature(
+                identity: GameBuildIdentity(
+                    bundleID: KnownGameBuild.current.bundleID,
+                    version: "unsupported",
+                    buildGUID: "unsupported-build"
+                ),
+                paths: GameBuildPaths(
+                    executablePath: KnownGameBuild.current.executablePath,
+                    metadataPath: KnownGameBuild.current.metadataPath
+                )
+            )
+        )
+    }
+
+    private static func readProjectFile(_ path: String) throws -> String {
+        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let url = root.appendingPathComponent(path)
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    private static func functionBody(named name: String, in source: String) throws -> String {
+        guard let signatureRange = source.range(of: "func \(name)()") else {
+            throw XCTSkip("Function \(name) not found")
+        }
+        let rest = source[signatureRange.lowerBound...]
+        guard let openingBrace = rest.firstIndex(of: "{") else {
+            throw XCTSkip("Function \(name) has no body")
+        }
+
+        var depth = 0
+        var end = openingBrace
+        for index in source[openingBrace...].indices {
+            if source[index] == "{" {
+                depth += 1
+            } else if source[index] == "}" {
+                depth -= 1
+                if depth == 0 {
+                    end = index
+                    break
+                }
+            }
+        }
+        return String(source[openingBrace...end])
+    }
+}
+
+private extension AppStore.Dependencies {
+    static func test(install: GameInstall, memoryAccess: MemoryAccess = CurrentProcessMemoryAccess()) -> AppStore.Dependencies {
+        AppStore.Dependencies(
+            installResolver: FixedGameInstallResolver(install: install),
+            processResolver: FixedProcessResolver(),
+            memoryAccess: memoryAccess
+        )
+    }
+}
+
+private struct FixedGameInstallResolver: GameInstallResolving {
+    let install: GameInstall
+
+    func resolveInstalledGame() throws -> GameInstall {
+        install
+    }
+
+    func validateCurrentInstall() throws -> GameInstall {
+        install
+    }
+}
+
+private struct FixedProcessResolver: ProcessResolving {
+    func resolve(_ request: ProcessResolveRequest) throws -> TargetProcess {
+        TargetProcess(
+            pid: getpid(),
+            name: "DAVE THE DIVER",
+            executablePath: request.executablePath
+        )
+    }
+}
+
+private struct CurrentProcessMemoryAccess: MemoryAccess {
+    func attach(to process: TargetProcess) throws -> MemorySession {
+        MachMemoryAccess().currentProcessSession()
+    }
+}
+
+private final class RecordingMemoryAccess: MemoryAccess {
+    private(set) var attachCount = 0
+
+    func attach(to process: TargetProcess) throws -> MemorySession {
+        attachCount += 1
+        return MachMemoryAccess().currentProcessSession()
+    }
+}
