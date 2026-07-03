@@ -75,7 +75,7 @@ silently ignored.
 ## Build From Source
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Empress7211/DaveTheTrainer.git
 cd DaveTheTrainer
 swift test
 ./script/build_and_run.sh
