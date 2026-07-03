@@ -17,6 +17,7 @@ DEFAULT_LOCAL_APP_DIR="${HOME:?HOME is required}/Applications"
 LOCAL_APP_DIR="${DAVE_TRAINER_LOCAL_APP_DIR:-$DEFAULT_LOCAL_APP_DIR}"
 LOCAL_APP_BUNDLE="$LOCAL_APP_DIR/$APP_NAME.app"
 STAGE_DIR="$ROOT_DIR/.build/release-bundle-stage"
+ZIP_VERIFY_DIR="$ROOT_DIR/.build/release-zip-verify"
 STAGE_BUNDLE="$STAGE_DIR/$APP_NAME.app"
 APP_CONTENTS="$STAGE_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
@@ -113,6 +114,11 @@ verify_project_zip() {
     echo "release zip contains AppleDouble or .DS_Store metadata: $APP_ZIP" >&2
     exit 1
   fi
+
+  rm -rf "$ZIP_VERIFY_DIR"
+  mkdir -p "$ZIP_VERIFY_DIR"
+  /usr/bin/ditto -x -k "$APP_ZIP" "$ZIP_VERIFY_DIR"
+  /usr/bin/codesign --verify --deep --strict "$ZIP_VERIFY_DIR/$APP_NAME.app"
 }
 
 SIGN_IDENTITY="$(resolve_sign_identity)"

@@ -26,6 +26,9 @@ final class ReleaseScriptPolicyTests: XCTestCase {
 
         XCTAssertTrue(script.contains("zipinfo -1 \"$APP_ZIP\""))
         XCTAssertTrue(script.contains("(^|/)\\._|\\.DS_Store"))
+        XCTAssertTrue(script.contains("ZIP_VERIFY_DIR=\"$ROOT_DIR/.build/release-zip-verify\""))
+        XCTAssertTrue(script.contains("/usr/bin/ditto -x -k \"$APP_ZIP\" \"$ZIP_VERIFY_DIR\""))
+        XCTAssertTrue(script.contains("/usr/bin/codesign --verify --deep --strict \"$ZIP_VERIFY_DIR/$APP_NAME.app\""))
     }
 
     func testRuntimeLivePatchCliRequiresExplicitDevelopmentFlag() throws {

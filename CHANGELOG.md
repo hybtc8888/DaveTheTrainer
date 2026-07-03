@@ -6,6 +6,7 @@
 - Added English and Chinese README documentation.
 - Documented release zip installation, Gatekeeper behavior, and exact build support.
 - Added repository logo presentation in README files.
+- Verified extracted release zip app signatures during packaging.
 
 ## Unreleased
 
