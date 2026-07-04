@@ -2,7 +2,7 @@ import XCTest
 @testable import TrainerCore
 
 final class DaveTrainerManifestTests: XCTestCase {
-    func testCurrentManifestUsesKnownDaveBuildAndDisablesPlayerRuntimeScanning() {
+    func testCurrentManifestKeepsKnownDaveBuildAsBaselineAndUsesFeatureLevelValidation() {
         let manifest = DaveTrainerManifest.current
 
         XCTAssertEqual(manifest.schemaVersion, DaveTrainerManifest.currentSchemaVersion)
@@ -14,7 +14,7 @@ final class DaveTrainerManifestTests: XCTestCase {
         XCTAssertTrue(manifest.features.allSatisfy { feature in
             feature.playerRuntimePolicy.allowRuntimeScanning == false
                 && feature.playerRuntimePolicy.failureMode == .failLoud
-                && feature.playerRuntimePolicy.requiresBuildMatch
+                && !feature.playerRuntimePolicy.requiresBuildMatch
         })
     }
 

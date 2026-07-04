@@ -89,7 +89,7 @@ private struct LogoBlock: View {
                 .font(.system(size: 22, weight: .heavy, design: .rounded))
                 .tracking(8)
                 .foregroundStyle(.white)
-            Text("v1.0.6 Mac Plus Trainer")
+            Text("Adaptive Mac Trainer")
                 .font(.title3.bold())
                 .foregroundStyle(.orange)
         }

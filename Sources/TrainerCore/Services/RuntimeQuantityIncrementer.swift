@@ -34,6 +34,12 @@ private let maximumReasonableQuantityValue = Int32(1_000_000_000)
 private let mainChefFlameCacheKey = "artisan.main"
 private let jungleChefFlameCacheKey = "artisan.jungle"
 
+private struct RuntimeQuantityReadBackRequest {
+    let address: UInt64
+    let size: Int
+    let descriptor: String
+}
+
 public struct ObscuredInt32Value: Equatable, Sendable {
     public let currentCryptoKey: Int32
     public let hiddenValue: Int32
@@ -292,7 +298,6 @@ public struct RuntimeQuantityIncrementResult: Sendable, Equatable {
 
 private struct CachedGameAssembly {
     let processID: Int32
-    let buildGUID: String
     let module: LoadedMachOModule
 }
 
@@ -349,7 +354,15 @@ public final class RuntimeQuantityIncrementer {
         let module = try resolveGameAssembly(session: session)
         let cacheKey = makeCacheKey(featureID: request.featureID, module: module, session: session)
         if let cachedAddresses = cachedFeatureAddresses[cacheKey] {
-            return try incrementCachedObscuredInt32Addresses(cachedAddresses, cacheKey: cacheKey, request: request, session: session)
+            do {
+                return try incrementCachedObscuredInt32Addresses(cachedAddresses, cacheKey: cacheKey, request: request, session: session)
+            } catch {
+                return try retryPlayerInfoSaveQuantityAfterCachedFailure(
+                    error,
+                    request: request,
+                    session: session
+                )
+            }
         }
 
         let address = try resolvePlayerInfoSaveFieldAddress(featureID: request.featureID, module: module, session: session)
@@ -389,7 +402,15 @@ public final class RuntimeQuantityIncrementer {
         let module = try resolveGameAssembly(session: session)
         let cacheKey = makeCacheKey(featureID: request.featureID, module: module, session: session)
         if let cachedAddresses = cachedFeatureAddresses[cacheKey] {
-            return try incrementCachedPlainInt32Addresses(cachedAddresses, cacheKey: cacheKey, request: request, session: session)
+            do {
+                return try incrementCachedPlainInt32Addresses(cachedAddresses, cacheKey: cacheKey, request: request, session: session)
+            } catch {
+                return try retryJungleGoldAfterCachedFailure(
+                    error,
+                    request: request,
+                    session: session
+                )
+            }
         }
 
         let address = try resolveJunglePlainInt32Address(
@@ -449,15 +470,13 @@ public final class RuntimeQuantityIncrementer {
     private func resolveGameAssembly(session: RuntimeQuantityMemorySession) throws -> LoadedMachOModule {
         let processID = processID(for: session)
         if let cachedGameAssembly,
-           cachedGameAssembly.processID == processID,
-           cachedGameAssembly.buildGUID == KnownGameBuild.current.buildGUID {
+           cachedGameAssembly.processID == processID {
             return cachedGameAssembly.module
         }
 
         let module = try moduleResolver.resolveGameAssembly(session: session)
         cachedGameAssembly = CachedGameAssembly(
             processID: processID,
-            buildGUID: KnownGameBuild.current.buildGUID,
             module: module
         )
         return module
@@ -470,11 +489,50 @@ public final class RuntimeQuantityIncrementer {
     ) -> RuntimeAddressCacheKey {
         RuntimeAddressCacheKey(
             processID: processID(for: session),
-            buildGUID: KnownGameBuild.current.buildGUID,
+            buildFingerprint: module.moduleIdentity,
             moduleBaseAddress: module.baseAddress,
             moduleIdentity: module.moduleIdentity,
             featureID: featureID
         )
+    }
+
+    private func retryPlayerInfoSaveQuantityAfterCachedFailure(
+        _ error: Error,
+        request: RuntimeQuantityIncrementRequest,
+        session: RuntimeQuantityMemorySession
+    ) throws -> RuntimeQuantityIncrementResult {
+        guard Self.isRecoverableCachedAddressFailure(error) else {
+            throw error
+        }
+
+        cachedGameAssembly = nil
+        let module = try resolveGameAssembly(session: session)
+        let address = try resolvePlayerInfoSaveFieldAddress(featureID: request.featureID, module: module, session: session)
+        try incrementObscuredInt32(address: address, delta: request.delta, session: session)
+        cachedFeatureAddresses[makeCacheKey(featureID: request.featureID, module: module, session: session)] = [address]
+        return RuntimeQuantityIncrementResult(updatedAddressCount: 1)
+    }
+
+    private func retryJungleGoldAfterCachedFailure(
+        _ error: Error,
+        request: RuntimeQuantityIncrementRequest,
+        session: RuntimeQuantityMemorySession
+    ) throws -> RuntimeQuantityIncrementResult {
+        guard Self.isRecoverableCachedAddressFailure(error) else {
+            throw error
+        }
+
+        cachedGameAssembly = nil
+        let module = try resolveGameAssembly(session: session)
+        let address = try resolveJunglePlainInt32Address(
+            fieldOffset: saveDataJungleGoldOffset,
+            descriptor: "丛林货币",
+            module: module,
+            session: session
+        )
+        try incrementPlainInt32(address: address, delta: request.delta, session: session)
+        cachedFeatureAddresses[makeCacheKey(featureID: request.featureID, module: module, session: session)] = [address]
+        return RuntimeQuantityIncrementResult(updatedAddressCount: 1)
     }
 
     private func processID(for session: RuntimeQuantityMemorySession) -> Int32 {
@@ -705,7 +763,10 @@ public final class RuntimeQuantityIncrementer {
         let nextValue = try incrementedInt32(current.value, delta: delta)
         let expected = current.replacingValue(nextValue).data
         try session.write(MemoryWriteRequest(address: address, data: expected))
-        let verified = try session.read(MemoryReadRequest(address: address, size: obscuredInt32ByteCount))
+        let verified = try readBackVerifiedBytes(
+            RuntimeQuantityReadBackRequest(address: address, size: obscuredInt32ByteCount, descriptor: "ObscuredInt32"),
+            session: session
+        )
         guard verified == expected else {
             throw TrainerError.verifyFailed("ObscuredInt32 数量写后校验失败：0x\(String(address, radix: 16))。")
         }
@@ -723,9 +784,23 @@ public final class RuntimeQuantityIncrementer {
         let nextValue = try incrementedInt32(current, delta: delta)
         let expected = Data(littleEndianBytes: nextValue.littleEndian)
         try session.write(MemoryWriteRequest(address: address, data: expected))
-        let verified = try session.read(MemoryReadRequest(address: address, size: MemoryLayout<Int32>.size))
+        let verified = try readBackVerifiedBytes(
+            RuntimeQuantityReadBackRequest(address: address, size: MemoryLayout<Int32>.size, descriptor: "Int32"),
+            session: session
+        )
         guard verified == expected else {
             throw TrainerError.verifyFailed("Int32 数量写后校验失败：0x\(String(address, radix: 16))。")
+        }
+    }
+
+    private func readBackVerifiedBytes(
+        _ request: RuntimeQuantityReadBackRequest,
+        session: RuntimeQuantityMemorySession
+    ) throws -> Data {
+        do {
+            return try session.read(MemoryReadRequest(address: request.address, size: request.size))
+        } catch {
+            throw TrainerError.verifyFailed("\(request.descriptor) 数量写后读回失败：0x\(String(request.address, radix: 16))。\(error.localizedDescription)")
         }
     }
 
@@ -735,6 +810,13 @@ public final class RuntimeQuantityIncrementer {
             delta: delta,
             overflowMessage: "数量增量结果越界。"
         )
+    }
+
+    private static func isRecoverableCachedAddressFailure(_ error: Error) -> Bool {
+        if case TrainerError.memoryReadFailed = error {
+            return true
+        }
+        return false
     }
 }
 

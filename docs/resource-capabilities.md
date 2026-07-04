@@ -4,7 +4,7 @@ This document records player-facing resource operations that are backed by `Dave
 
 ## Rules
 
-- Player buttons use manifest feature IDs and exact object paths or patch points.
+- Player buttons use manifest feature IDs and validated object paths or patch points.
 - Player buttons must not trigger global memory scanning.
 - Missing runtime roots, save entries, or eligible item entries must fail loudly.
 - Existing-entry operations do not create new inventory entries, unlock recipes, or mutate discovery records.

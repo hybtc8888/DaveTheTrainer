@@ -3,7 +3,7 @@ import TrainerCore
 @testable import DaveTheTrainer
 
 final class TrainerOperationServiceTests: XCTestCase {
-    func testUnsupportedBuildReturnsResultWithoutWritingMemory() throws {
+    func testUnknownBuildStaticPatchUsesFeatureValidation() throws {
         let applier = RecordingTrainerOperationApplier()
         let service = TrainerOperationService(configuration: .test(applier: applier))
         let result = try service.apply(
@@ -11,8 +11,8 @@ final class TrainerOperationServiceTests: XCTestCase {
             context: TrainerOperationContext(session: Self.session(), gameBuild: Self.unsupportedBuild)
         )
 
-        XCTAssertEqual(result.state, .unsupportedBuild)
-        XCTAssertTrue(applier.requests.isEmpty)
+        XCTAssertEqual(result.state, .bytesApplied)
+        XCTAssertEqual(applier.requests.map(\.patch.id), ["god.0"])
     }
 
     func testUnknownManifestFeatureReturnsTargetMismatchWithoutWritingMemory() throws {
@@ -25,6 +25,49 @@ final class TrainerOperationServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(result.state, .targetMismatch)
+        XCTAssertTrue(applier.requests.isEmpty)
+    }
+
+    func testStaticPatchOutsideManifestFeatureReturnsTargetMismatchWithoutWritingMemory() throws {
+        let applier = RecordingTrainerOperationApplier()
+        let service = TrainerOperationService(configuration: .test(applier: applier))
+        let result = try service.apply(
+            TrainerOperationRequest(featureID: .god, isEnabled: true, payload: .staticPatch(patchID: "oxygen")),
+            context: TrainerOperationContext(session: Self.session(), gameBuild: KnownGameBuild.current)
+        )
+
+        XCTAssertEqual(result.state, .targetMismatch)
+        XCTAssertTrue(applier.preflightRequests.isEmpty)
+        XCTAssertTrue(applier.requests.isEmpty)
+    }
+
+    func testPatchGroupOutsideManifestFeatureReturnsTargetMismatchWithoutWritingMemory() throws {
+        let applier = RecordingTrainerOperationApplier()
+        let service = TrainerOperationService(configuration: .test(applier: applier))
+        let result = try service.apply(
+            TrainerOperationRequest(
+                featureID: .divingGod,
+                isEnabled: true,
+                payload: .staticPatchGroup(patchIDs: ["god", "oxygen", "swimSpeed"])
+            ),
+            context: TrainerOperationContext(session: Self.session(), gameBuild: KnownGameBuild.current)
+        )
+
+        XCTAssertEqual(result.state, .targetMismatch)
+        XCTAssertTrue(applier.preflightRequests.isEmpty)
+        XCTAssertTrue(applier.requests.isEmpty)
+    }
+
+    func testValuePatchOutsideManifestFeatureReturnsTargetMismatchWithoutWritingMemory() throws {
+        let applier = RecordingTrainerOperationApplier()
+        let service = TrainerOperationService(configuration: .test(applier: applier))
+        let result = try service.apply(
+            TrainerOperationRequest(featureID: .god, isEnabled: true, payload: .valuePatch(patchID: "swimSpeed", valueText: "6")),
+            context: TrainerOperationContext(session: Self.session(), gameBuild: KnownGameBuild.current)
+        )
+
+        XCTAssertEqual(result.state, .targetMismatch)
+        XCTAssertTrue(applier.preflightRequests.isEmpty)
         XCTAssertTrue(applier.requests.isEmpty)
     }
 
@@ -100,7 +143,10 @@ final class TrainerOperationServiceTests: XCTestCase {
 
     func testSinglePatchFailureRollsBackPreviouslyAppliedPatchPoint() throws {
         let applier = RecordingTrainerOperationApplier(failingPatchID: "multiGod.1", failingEnabledState: true)
-        let service = TrainerOperationService(configuration: .test(applier: applier))
+        let service = TrainerOperationService(configuration: .test(
+            manifest: Self.manifest(featureID: .god, patchID: "multiGod"),
+            applier: applier
+        ))
         let result = try service.apply(
             TrainerOperationRequest(featureID: .god, isEnabled: true, payload: .staticPatch(patchID: "multiGod")),
             context: TrainerOperationContext(session: Self.session(), gameBuild: KnownGameBuild.current)
@@ -128,7 +174,7 @@ final class TrainerOperationServiceTests: XCTestCase {
         XCTAssertEqual(runtimeIncrementer.requests, [RuntimeQuantityIncrementRequest(featureID: "gold", delta: 99)])
     }
 
-    func testRuntimeResourceUnsupportedBuildDoesNotCallIncrementer() throws {
+    func testUnknownBuildRuntimeResourceUsesFeatureValidation() throws {
         let runtimeIncrementer = RecordingRuntimeQuantityIncrementer(result: RuntimeQuantityIncrementResult(updatedAddressCount: 1))
         let service = TrainerOperationService(configuration: .test(
             applier: RecordingTrainerOperationApplier(),
@@ -139,8 +185,8 @@ final class TrainerOperationServiceTests: XCTestCase {
             context: TrainerOperationContext(session: Self.session(), gameBuild: Self.unsupportedBuild)
         )
 
-        XCTAssertEqual(result.state, .unsupportedBuild)
-        XCTAssertEqual(runtimeIncrementer.requests, [])
+        XCTAssertEqual(result.state, .behaviorVerified)
+        XCTAssertEqual(runtimeIncrementer.requests, [RuntimeQuantityIncrementRequest(featureID: "gold", delta: 99)])
     }
 
     func testResourceWithoutManifestCapabilityReturnsTargetMismatch() throws {
@@ -412,5 +458,33 @@ private extension TrainerOperationServiceTests {
                 )
             }
         )
+    }
+
+    static func manifest(featureID: DaveTrainerFeatureID, patchID: String) -> DaveTrainerManifest {
+        DaveTrainerManifest(
+            schemaVersion: DaveTrainerManifest.currentSchemaVersion,
+            gameBuild: KnownGameBuild.current,
+            features: [
+                DaveTrainerManifestFeature(
+                    id: featureID,
+                    title: featureID.rawValue,
+                    kind: .codePatch,
+                    targets: patchTargets(patchID: patchID)
+                )
+            ]
+        )
+    }
+
+    static func patchTargets(patchID: String) -> [DaveTrainerManifestTarget] {
+        guard let patch = testPatches[patchID] else {
+            return []
+        }
+        return patch.points.enumerated().map { index, point in
+            DaveTrainerManifestTarget.patchPoint(DaveManifestPatchPoint(
+                id: "\(patchID).\(index)",
+                moduleID: DaveTrainerManifest.gameAssemblyModuleID,
+                point: point
+            ))
+        }
     }
 }

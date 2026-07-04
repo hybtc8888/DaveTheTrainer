@@ -20,7 +20,7 @@
 - Game not running.
 - Permission denied.
 - Permission granted.
-- Unsupported game build.
+- Unknown game build with feature-level validation failure.
 - Supported build with a reversible patch.
 - Inventory operation with missing entry.
 - Uninstall path.

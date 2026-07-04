@@ -36,6 +36,14 @@ public struct GameBuildSignature: Equatable, Codable, Sendable {
         self.executablePath = paths.executablePath
         self.metadataPath = paths.metadataPath
     }
+
+    public var isKnownBaseline: Bool {
+        self == KnownGameBuild.current
+    }
+
+    public var isDaveTheDiverBundle: Bool {
+        bundleID == KnownGameBuild.current.bundleID
+    }
 }
 
 public enum KnownGameBuild {

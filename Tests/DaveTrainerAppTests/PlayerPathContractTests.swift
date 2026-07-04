@@ -49,45 +49,47 @@ final class PlayerPathContractTests: XCTestCase {
         XCTAssertEqual(legacyActions.map(\.id), [])
     }
 
-    func testUnsupportedBuildDoesNotMarkPatchEnabled() throws {
+    func testUnknownBuildPatchAttemptsFeatureValidationWithoutMarkingPatchEnabled() async throws {
         let memoryAccess = RecordingMemoryAccess()
         let store = AppStore(dependencies: .test(install: Self.unsupportedInstall, memoryAccess: memoryAccess))
         let option = try XCTUnwrap(SimpleTrainerOptions.diving.first { $0.id == "god" })
-        var completionResult: Bool?
 
-        store.applySimpleOption(SimpleTrainerActionRequest(
-            option: option,
-            isEnabled: true,
-            valueText: option.defaultValue
-        )) { success in
-            completionResult = success
+        let completionResult = await withCheckedContinuation { continuation in
+            store.applySimpleOption(SimpleTrainerActionRequest(
+                option: option,
+                isEnabled: true,
+                valueText: option.defaultValue
+            )) { success in
+                continuation.resume(returning: success)
+            }
         }
 
         XCTAssertEqual(completionResult, false)
         XCTAssertFalse(store.isPatchEnabled(id: "god"))
-        XCTAssertEqual(store.latestOperationResult?.state, .unsupportedBuild)
+        XCTAssertEqual(store.latestOperationResult?.state, .writeFailed)
         XCTAssertTrue(store.latestMessageIsError)
-        XCTAssertEqual(memoryAccess.attachCount, 0)
+        XCTAssertEqual(memoryAccess.attachCount, 1)
     }
 
-    func testRuntimeResourceUnsupportedBuildDoesNotAttachOrWrite() throws {
+    func testUnknownBuildRuntimeResourceAttemptsFeatureValidation() async throws {
         let memoryAccess = RecordingMemoryAccess()
         let store = AppStore(dependencies: .test(install: Self.unsupportedInstall, memoryAccess: memoryAccess))
         let option = try XCTUnwrap(SimpleTrainerOptions.currencies.first { $0.id == "money" })
-        var completionResult: Bool?
 
-        store.applySimpleOption(SimpleTrainerActionRequest(
-            option: option,
-            isEnabled: true,
-            valueText: option.defaultValue
-        )) { success in
-            completionResult = success
+        let completionResult = await withCheckedContinuation { continuation in
+            store.applySimpleOption(SimpleTrainerActionRequest(
+                option: option,
+                isEnabled: true,
+                valueText: option.defaultValue
+            )) { success in
+                continuation.resume(returning: success)
+            }
         }
 
         XCTAssertEqual(completionResult, false)
-        XCTAssertEqual(store.latestOperationResult?.state, .unsupportedBuild)
+        XCTAssertEqual(store.latestOperationResult?.state, .writeFailed)
         XCTAssertTrue(store.latestMessageIsError)
-        XCTAssertEqual(memoryAccess.attachCount, 0)
+        XCTAssertEqual(memoryAccess.attachCount, 1)
     }
 
     private static var unsupportedInstall: GameInstall {

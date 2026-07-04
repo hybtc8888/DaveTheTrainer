@@ -1,7 +1,8 @@
 # Compatibility Request
 
-Compatibility is exact, not best-effort. Requests are welcome, but support is
-added only after a build-specific manifest is reviewed, tested, and released.
+Compatibility is feature-resolved, not version-whitelisted. Requests are
+welcome when a feature fails its locator, target validation, write, or readback
+check on a detected build.
 
 ## Game Build
 
@@ -9,12 +10,21 @@ added only after a build-specific manifest is reviewed, tested, and released.
 - Platform:
 - Store or distribution channel:
 - Is `GameAssembly.dylib` present:
+- Detected GameAssembly UUID, if shown:
+- Detected metadata version, if shown:
+
+## Feature Failure
+
+- Feature that failed:
+- Operation result state:
+- Redacted log message:
+- Did other features still work:
 
 ## Validation Help
 
 - Can you run local test builds:
 - Can you provide redacted compatibility logs:
-- Can you help verify unsupported-build failure behavior:
+- Can you help verify the feature-level failure and a patched build:
 
 ## Notes
 

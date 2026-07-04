@@ -120,6 +120,60 @@ final class RuntimeQuantityIncrementerTests: XCTestCase {
         }
     }
 
+    func testCachedAddressVerifyFailureDoesNotRetryAndDoubleIncrement() throws {
+        let fixture = StaticSaveChainFixture()
+        let session = InMemoryRuntimeQuantitySession(segments: fixture.segments)
+        let incrementer = RuntimeQuantityIncrementer(moduleResolver: fixture.moduleResolver)
+
+        _ = try incrementer.increment(
+            RuntimeQuantityIncrementRequest(featureID: "gold", delta: 99),
+            session: session
+        )
+        session.ignoreWrites(to: fixture.playerInfoAddress + 0x10)
+
+        XCTAssertThrowsError(try incrementer.increment(
+            RuntimeQuantityIncrementRequest(featureID: "gold", delta: 1),
+            session: session
+        )) { error in
+            guard case TrainerError.verifyFailed = error else {
+                XCTFail("Expected verifyFailed, got \(error)")
+                return
+            }
+        }
+
+        let stored = try session.read(MemoryReadRequest(address: fixture.playerInfoAddress + 0x10, size: 0x14))
+        XCTAssertEqual(ObscuredInt32Value(data: stored)?.value, 1_099)
+        XCTAssertEqual(fixture.moduleResolver.resolveCallCount, 1)
+    }
+
+    func testCachedObscuredInt32ReadbackFailureDoesNotRetryAndDoubleIncrement() throws {
+        let fixture = StaticSaveChainFixture()
+        let session = InMemoryRuntimeQuantitySession(segments: fixture.segments)
+        let incrementer = RuntimeQuantityIncrementer(moduleResolver: fixture.moduleResolver)
+        let goldAddress = fixture.playerInfoAddress + 0x10
+
+        _ = try incrementer.increment(
+            RuntimeQuantityIncrementRequest(featureID: "gold", delta: 99),
+            session: session
+        )
+        session.failReadsAfterSuccessfulWrite(to: goldAddress)
+
+        XCTAssertThrowsError(try incrementer.increment(
+            RuntimeQuantityIncrementRequest(featureID: "gold", delta: 1),
+            session: session
+        )) { error in
+            guard case TrainerError.verifyFailed = error else {
+                XCTFail("Expected verifyFailed, got \(error)")
+                return
+            }
+        }
+
+        session.allowReads(to: goldAddress)
+        let stored = try session.read(MemoryReadRequest(address: goldAddress, size: 0x14))
+        XCTAssertEqual(ObscuredInt32Value(data: stored)?.value, 1_100)
+        XCTAssertEqual(fixture.moduleResolver.resolveCallCount, 1)
+    }
+
     func testRuntimeIncrementerClampsNegativeGoldDeltaToOne() throws {
         let fixture = StaticSaveChainFixture()
         let session = InMemoryRuntimeQuantitySession(segments: fixture.segments)
@@ -154,7 +208,33 @@ final class RuntimeQuantityIncrementerTests: XCTestCase {
         XCTAssertEqual(ObscuredInt32Value(data: stored)?.value, 1_100)
     }
 
-    func testOldCachedAddressFailureIsExposedInsteadOfRetryScanning() throws {
+    func testOldCachedAddressFailureClearsCacheAndRetriesOnce() throws {
+        let fixture = StaticSaveChainFixture()
+        let session = InMemoryRuntimeQuantitySession(segments: fixture.segments)
+        let incrementer = RuntimeQuantityIncrementer(moduleResolver: fixture.moduleResolver)
+
+        _ = try incrementer.increment(
+            RuntimeQuantityIncrementRequest(featureID: "gold", delta: 99),
+            session: session
+        )
+        try session.write(MemoryWriteRequest(address: fixture.playerInfoAddress + 0x10, data: Data(count: 0x14)))
+        var replacementPointer = Data(count: 8)
+        replacementPointer.writeUInt64(fixture.replacementPlayerInfoAddress, at: 0)
+        try session.write(MemoryWriteRequest(address: fixture.saveDataAddress + 0x220, data: replacementPointer))
+
+        let result = try incrementer.increment(
+            RuntimeQuantityIncrementRequest(featureID: "gold", delta: 1),
+            session: session
+        )
+
+        let stored = try session.read(MemoryReadRequest(address: fixture.replacementPlayerInfoAddress + 0x10, size: 0x14))
+        XCTAssertEqual(result.updatedAddressCount, 1)
+        XCTAssertEqual(ObscuredInt32Value(data: stored)?.value, 5_001)
+        XCTAssertEqual(fixture.moduleResolver.resolveCallCount, 2)
+        XCTAssertEqual(session.regionsCallCount, 0)
+    }
+
+    func testOldCachedAddressRetryFailureIsExposed() throws {
         let fixture = StaticSaveChainFixture()
         let session = InMemoryRuntimeQuantitySession(segments: fixture.segments)
         let incrementer = RuntimeQuantityIncrementer(moduleResolver: fixture.moduleResolver)
@@ -169,7 +249,7 @@ final class RuntimeQuantityIncrementerTests: XCTestCase {
             RuntimeQuantityIncrementRequest(featureID: "gold", delta: 1),
             session: session
         ))
-        XCTAssertEqual(fixture.moduleResolver.resolveCallCount, 1)
+        XCTAssertEqual(fixture.moduleResolver.resolveCallCount, 2)
         XCTAssertEqual(session.regionsCallCount, 0)
     }
 
@@ -244,6 +324,32 @@ final class RuntimeQuantityIncrementerTests: XCTestCase {
         XCTAssertEqual(try session.readInt32(address: fixture.jungleGoldAddress), 1_776)
     }
 
+    func testCachedPlainInt32ReadbackFailureDoesNotRetryAndDoubleIncrement() throws {
+        let fixture = StaticSaveChainFixture()
+        let session = InMemoryRuntimeQuantitySession(segments: fixture.segments)
+        let incrementer = RuntimeQuantityIncrementer(moduleResolver: fixture.moduleResolver)
+
+        _ = try incrementer.increment(
+            RuntimeQuantityIncrementRequest(featureID: "jungleGold", delta: 999),
+            session: session
+        )
+        session.failReadsAfterSuccessfulWrite(to: fixture.jungleGoldAddress)
+
+        XCTAssertThrowsError(try incrementer.increment(
+            RuntimeQuantityIncrementRequest(featureID: "jungleGold", delta: 1),
+            session: session
+        )) { error in
+            guard case TrainerError.verifyFailed = error else {
+                XCTFail("Expected verifyFailed, got \(error)")
+                return
+            }
+        }
+
+        session.allowReads(to: fixture.jungleGoldAddress)
+        XCTAssertEqual(try session.readInt32(address: fixture.jungleGoldAddress), 1_777)
+        XCTAssertEqual(fixture.moduleResolver.resolveCallCount, 1)
+    }
+
     func testRuntimeIncrementerClampsNegativeJungleGoldDeltaToOne() throws {
         let fixture = StaticSaveChainFixture()
         let session = InMemoryRuntimeQuantitySession(segments: fixture.segments)
@@ -277,7 +383,9 @@ final class RuntimeQuantityIncrementerTests: XCTestCase {
 
 private struct StaticSaveChainFixture {
     let moduleBaseAddress: UInt64
+    let saveDataAddress: UInt64
     let playerInfoAddress: UInt64
+    let replacementPlayerInfoAddress: UInt64
     let jungleGoldAddress: UInt64
     let jungleChefFlameAddress: UInt64
     let moduleResolver: StaticModuleResolver
@@ -286,6 +394,7 @@ private struct StaticSaveChainFixture {
     init() {
         let moduleBaseAddress = UInt64(0x1_0000_0000)
         let playerInfoAddress = UInt64(0x8_0000_0000)
+        let replacementPlayerInfoAddress = UInt64(0x8_1000_0000)
         let methodVariableAddress = moduleBaseAddress + 0x98D7948
         let typeInfoVariableAddress = moduleBaseAddress + 0x987ECF8
         let methodInfoAddress = UInt64(0x2_0000_0000)
@@ -301,7 +410,9 @@ private struct StaticSaveChainFixture {
         let jungleGoldHolderAddress = UInt64(0x7_5000_0000)
 
         self.moduleBaseAddress = moduleBaseAddress
+        self.saveDataAddress = saveDataAddress
         self.playerInfoAddress = playerInfoAddress
+        self.replacementPlayerInfoAddress = replacementPlayerInfoAddress
         self.jungleGoldAddress = jungleGoldHolderAddress + 0x10
         self.jungleChefFlameAddress = jungleGoldHolderAddress + 0x14
         self.moduleResolver = StaticModuleResolver(baseAddress: moduleBaseAddress)
@@ -323,6 +434,7 @@ private struct StaticSaveChainFixture {
                 jungleSaveDataAddress: jungleSaveDataAddress
             ),
             playerInfoAddress: Self.playerInfoSaveData(),
+            replacementPlayerInfoAddress: Self.playerInfoSaveData(gold: 5_000, bei: 6_000, chefFlame: 700),
             staleCurrentGameSaveAddress: Self.runtimeObjectData(count: 0x2B0),
             jungleSaveDataAddress: Self.jungleSaveData(holderAddress: jungleGoldHolderAddress),
             jungleGoldHolderAddress: Self.jungleGoldHolderData()
@@ -388,11 +500,11 @@ private struct StaticSaveChainFixture {
         return data
     }
 
-    private static func playerInfoSaveData() -> Data {
+    private static func playerInfoSaveData(gold: Int32 = 1_000, bei: Int32 = 2_000, chefFlame: Int32 = 300) -> Data {
         var data = runtimeObjectData(count: 0x4C)
-        data.writeObscuredInt32(1_000, at: 0x10)
-        data.writeObscuredInt32(2_000, at: 0x24)
-        data.writeObscuredInt32(300, at: 0x38)
+        data.writeObscuredInt32(gold, at: 0x10)
+        data.writeObscuredInt32(bei, at: 0x24)
+        data.writeObscuredInt32(chefFlame, at: 0x38)
         return data
     }
 
@@ -434,7 +546,9 @@ private final class StaticModuleResolver: GameAssemblyResolving {
 private final class InMemoryRuntimeQuantitySession: RuntimeQuantityMemorySession {
     let runtimeProcessID: Int32
     private let orderedBaseAddresses: [UInt64]
-    private let ignoredWriteAddresses: Set<UInt64>
+    private var ignoredWriteAddresses: Set<UInt64>
+    private var readFailureAddresses: Set<UInt64>
+    private var readFailureAfterWriteAddresses: Set<UInt64>
     private var segments: [UInt64: Data]
     private(set) var regionsCallCount = 0
 
@@ -446,7 +560,22 @@ private final class InMemoryRuntimeQuantitySession: RuntimeQuantityMemorySession
         self.runtimeProcessID = runtimeProcessID
         self.orderedBaseAddresses = segments.keys.sorted()
         self.ignoredWriteAddresses = ignoredWriteAddresses
+        self.readFailureAddresses = []
+        self.readFailureAfterWriteAddresses = []
         self.segments = segments
+    }
+
+    func ignoreWrites(to address: UInt64) {
+        ignoredWriteAddresses.insert(address)
+    }
+
+    func failReadsAfterSuccessfulWrite(to address: UInt64) {
+        readFailureAfterWriteAddresses.insert(address)
+    }
+
+    func allowReads(to address: UInt64) {
+        readFailureAddresses.remove(address)
+        readFailureAfterWriteAddresses.remove(address)
     }
 
     func regions() throws -> [MemoryRegion] {
@@ -465,6 +594,9 @@ private final class InMemoryRuntimeQuantitySession: RuntimeQuantityMemorySession
     }
 
     func read(_ request: MemoryReadRequest) throws -> Data {
+        guard !readFailureAddresses.contains(request.address) else {
+            throw TrainerError.memoryReadFailed("测试强制读回失败：0x\(String(request.address, radix: 16))。")
+        }
         let resolved = try resolvedSegment(address: request.address, size: request.size)
         return resolved.data.subdata(in: resolved.offset..<(resolved.offset + request.size))
     }
@@ -477,6 +609,9 @@ private final class InMemoryRuntimeQuantitySession: RuntimeQuantityMemorySession
         var data = resolved.data
         data.replaceSubrange(resolved.offset..<(resolved.offset + request.data.count), with: request.data)
         segments[resolved.baseAddress] = data
+        if readFailureAfterWriteAddresses.contains(request.address) {
+            readFailureAddresses.insert(request.address)
+        }
     }
 
     func readInt32(address: UInt64) throws -> Int32 {

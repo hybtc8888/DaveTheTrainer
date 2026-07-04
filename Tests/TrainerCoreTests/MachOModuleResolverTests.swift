@@ -35,7 +35,25 @@ final class MachOModuleResolverTests: XCTestCase {
         XCTAssertEqual(identity.cacheKey, "GameAssembly.dylib:arm64:7BA6FD17-58B4-31CC-A621-45EE26D462F9")
     }
 
-    func testResolverRejectsExpectedGameAssemblyUUIDMismatch() throws {
+    func testStrictPolicyRejectsExpectedGameAssemblyUUIDMismatch() throws {
+        let session = SingleModuleSession(data: try readHeader(path: gameAssemblyPath))
+        let resolver = MachOModuleResolver(expectedModuleIdentity: DaveModuleIdentity(
+            id: DaveTrainerManifest.gameAssemblyModuleID,
+            moduleName: "GameAssembly.dylib",
+            architecture: "arm64",
+            machoUUID: "00000000-0000-0000-0000-000000000000",
+            pathMatchPolicy: "image-name"
+        ), validationPolicy: .strict)
+
+        XCTAssertThrowsError(try resolver.resolveGameAssembly(session: session)) { error in
+            guard case TrainerError.targetMismatch = error else {
+                XCTFail("Expected targetMismatch, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testAdaptivePolicyAcceptsGameAssemblyUUIDMismatchAsProfileSignal() throws {
         let session = SingleModuleSession(data: try readHeader(path: gameAssemblyPath))
         let resolver = MachOModuleResolver(expectedModuleIdentity: DaveModuleIdentity(
             id: DaveTrainerManifest.gameAssemblyModuleID,
@@ -45,12 +63,13 @@ final class MachOModuleResolverTests: XCTestCase {
             pathMatchPolicy: "image-name"
         ))
 
-        XCTAssertThrowsError(try resolver.resolveGameAssembly(session: session)) { error in
-            guard case TrainerError.targetMismatch = error else {
-                XCTFail("Expected targetMismatch, got \(error)")
-                return
-            }
-        }
+        let module = try resolver.resolveGameAssembly(session: session)
+
+        XCTAssertEqual(module.moduleIdentity, "GameAssembly.dylib:arm64:7BA6FD17-58B4-31CC-A621-45EE26D462F9")
+        XCTAssertEqual(module.identityValidation, .uuidMismatch(
+            expected: "00000000-0000-0000-0000-000000000000",
+            actual: "7BA6FD17-58B4-31CC-A621-45EE26D462F9"
+        ))
     }
 
     private func readHeader(path: String, cpuType: UInt32 = arm64CPUType) throws -> Data {

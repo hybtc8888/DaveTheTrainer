@@ -2,7 +2,10 @@
 
 ## Scope
 
-This note documents the inventory and item-count storage planes found while fixing the trainer for `DAVE THE DIVER v1.0.6.675.mac` plus the `In the Jungle` DLC.
+This note documents the inventory and item-count storage planes observed on the
+validated baseline `DAVE THE DIVER v1.0.6.675.mac` plus the `In the Jungle` DLC.
+Other builds may work only when the relevant feature-level runtime validation
+passes.
 
 Evidence sources:
 

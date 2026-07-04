@@ -129,24 +129,26 @@ final class AppStore: ObservableObject {
         do {
             let resolvedInstall = try installResolver.resolveInstalledGame()
             install = resolvedInstall
-            if resolvedInstall.signature == KnownGameBuild.current {
-                log("已识别游戏：\(resolvedInstall.signature.version) / \(resolvedInstall.signature.buildGUID)")
+            features = DefaultTrainerFeatures.make(requiredBuild: resolvedInstall.signature)
+            if resolvedInstall.signature.isKnownBaseline {
+                log("已识别已验证基线：\(resolvedInstall.signature.version) / \(resolvedInstall.signature.buildGUID)")
                 return
             }
-            let error = TrainerError.buildMismatch(expected: KnownGameBuild.current, actual: resolvedInstall.signature)
-            log(error.localizedDescription, isError: true)
+            log("已识别 Dave 安装：\(resolvedInstall.signature.version) / \(resolvedInstall.signature.buildGUID)。当前版本未作为完整基线验证，将按功能逐项定位和校验。")
         } catch {
             install = nil
+            features = DefaultTrainerFeatures.make(requiredBuild: KnownGameBuild.current)
             log(error.localizedDescription, isError: true)
         }
     }
 
     func refreshProcess() {
         do {
+            let signature = install?.signature ?? KnownGameBuild.current
             let request = ProcessResolveRequest(
-                bundleID: KnownGameBuild.current.bundleID,
+                bundleID: signature.bundleID,
                 executableName: "DAVE THE DIVER",
-                executablePath: KnownGameBuild.current.executablePath
+                executablePath: signature.executablePath
             )
             targetProcess = try processResolver.resolve(request)
             log("已找到进程：PID \(targetProcess?.pid ?? 0)")
@@ -244,10 +246,11 @@ final class AppStore: ObservableObject {
             guard let addressStore else {
                 throw TrainerError.fileOperationFailed("功能配置初始化失败：\(addressStoreInitializationError ?? "未知错误")")
             }
-            addressBook = try addressStore.load(build: KnownGameBuild.current)
+            let build = install?.signature ?? KnownGameBuild.current
+            addressBook = try addressStore.load(build: build)
             log("功能配置已加载：\(addressBook.entries.count) 项")
         } catch {
-            addressBook = .empty(build: KnownGameBuild.current)
+            addressBook = .empty(build: install?.signature ?? KnownGameBuild.current)
             log(error.localizedDescription, isError: true)
         }
     }
@@ -475,11 +478,6 @@ final class AppStore: ObservableObject {
         }
 
         let gameBuild = try currentOperationBuild()
-        if let buildResult = trainerOperationService.buildGateResult(featureID: featureID, gameBuild: gameBuild) {
-            publishOperationResult(buildResult)
-            return false
-        }
-
         let context = TrainerOperationContext(session: try requireSession(), gameBuild: gameBuild)
         let result = try trainerOperationService.apply(TrainerOperationRequest(
             featureID: featureID,
@@ -508,7 +506,7 @@ final class AppStore: ObservableObject {
 
     private func currentOperationBuild() throws -> GameBuildSignature {
         guard let signature = install?.signature else {
-            throw TrainerError.installNotFound("尚未识别支持的游戏安装，禁止执行玩家写入。")
+            throw TrainerError.installNotFound("尚未识别 Dave 安装，禁止执行玩家写入。")
         }
         return signature
     }
@@ -570,12 +568,6 @@ final class AppStore: ObservableObject {
                 throw TrainerError.invalidInput("未知 manifest feature：\(request.option.manifestFeatureID)")
             }
             let gameBuild = try currentOperationBuild()
-            if let buildResult = trainerOperationService.buildGateResult(featureID: featureID, gameBuild: gameBuild) {
-                publishOperationResult(buildResult)
-                completion(false)
-                return
-            }
-
             let activeSession = try requireSession()
             isBusy = true
             log("正在后台调整 \(request.option.title)：\(request.valueText)。")
@@ -626,7 +618,7 @@ final class AppStore: ObservableObject {
         guard let addressStore else {
             throw TrainerError.fileOperationFailed("功能配置初始化失败：\(addressStoreInitializationError ?? "未知错误")")
         }
-        let nextBook = try addressBook.updating(entry, expectedBuild: KnownGameBuild.current)
+        let nextBook = try addressBook.updating(entry, expectedBuild: addressBook.build)
         try addressStore.save(nextBook)
         addressBook = nextBook
     }

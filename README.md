@@ -17,9 +17,9 @@ DaveTheTrainer is a native macOS trainer for `DAVE THE DIVER`, built as a
 SwiftPM and SwiftUI app with a manifest-backed safety model.
 
 It is intentionally not a general memory scanner. Player-facing actions are
-bound to a known game build, a known Mach-O module, reviewed patch points, and
-documented runtime object paths. Unsupported builds fail before attach or write
-work begins.
+bound to reviewed manifest feature IDs, a validated Mach-O module shape,
+reviewed patch points, and documented runtime object paths. The known game
+build is a validated baseline profile, not a global compatibility kill switch.
 
 > This project is not affiliated with, endorsed by, or sponsored by MINTROCKET,
 > Nexon, or the creators of `DAVE THE DIVER`.
@@ -31,7 +31,7 @@ work begins.
 | Platform | macOS |
 | App type | Native SwiftUI app |
 | Package manager | Swift Package Manager |
-| Supported game build | `v1.0.6.675.mac` |
+| Validated baseline build | `v1.0.6.675.mac` |
 | Target module | `GameAssembly.dylib` |
 | Manifest schema | `1.0` |
 | Test coverage | XCTest coverage for manifest policy, patch transactions, runtime incrementers, release scripts, and player path contracts |
@@ -64,13 +64,15 @@ xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
 
 ## Compatibility Boundary
 
-Compatibility is exact, not best-effort. This repository currently supports
-`v1.0.6.675.mac` only. If Steam or another distributor updates your installed
-game to a newer Mac build, that newer build is unsupported until a matching
-manifest is reviewed, tested, and released.
+Compatibility is feature-level and validation-gated. This repository's fully
+validated baseline is `v1.0.6.675.mac`; Steam or distributor updates may still
+work for individual features when their own locator, target validation, write,
+and readback checks pass.
 
-The app is expected to reject unsupported builds before attach or write work
-starts. Do not treat visual similarity between game versions as compatibility.
+Game version, build GUID, Mach-O UUID, and metadata details are profile signals.
+They help choose and diagnose feature locators, but they do not reject the
+entire app by themselves. A feature that cannot locate or verify its target
+fails explicitly and does not mark itself successful.
 
 ## What It Can Do
 
@@ -85,15 +87,16 @@ build:
 - Sushi bar patches: stamina and wasabi.
 
 Inventory features only modify existing entries unless the manifest explicitly
-documents creation support. Missing roots, missing entries, verification
-failures, and unsupported builds are reported as failures instead of being
-silently ignored.
+documents creation support. Missing roots, missing entries, target mismatches,
+and verification failures are reported as failures instead of being silently
+ignored.
 
 ## Design Principles
 
 - Manifest first: player buttons map to reviewed manifest feature IDs.
-- Exact build binding: the app validates the supported game build and module
-  identity before memory writes.
+- Feature-level compatibility: unknown builds may be attempted, but each
+  feature must validate the module, target bytes or object path, and readback
+  before reporting success.
 - No silent fallback: failures surface as explicit errors, logs, or test
   failures.
 - Transactional patching: multi-point patch groups preflight targets and roll
@@ -107,7 +110,8 @@ silently ignored.
 
 - macOS 14 or newer.
 - Xcode command line tools with Swift 5.9 or newer.
-- A local macOS installation of `DAVE THE DIVER` build `v1.0.6.675.mac`.
+- A local macOS IL2CPP installation of `DAVE THE DIVER`; `v1.0.6.675.mac` is
+  the validated baseline profile.
 - Permission to attach to the running game process when using trainer actions.
 
 ## Build From Source
@@ -150,16 +154,16 @@ DAVE_TRAINER_SIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
 
 ## Using The App
 
-1. Start the supported macOS build of `DAVE THE DIVER`.
+1. Start the macOS build of `DAVE THE DIVER`.
 2. Launch `DaveTheTrainer`.
-3. Confirm that the app detects the game process and supported build.
+3. Confirm that the app detects the game process and build fingerprint.
 4. Apply only the one-click trainer operation you intend to use.
 5. If macOS asks for administrator authorization, review the prompt and allow
    it only for the trainer attach/read/write operation.
 
-The app should fail loudly when the game is missing, the build is unsupported,
-the target module does not match the manifest, permission is denied, or readback
-verification fails.
+The app should fail loudly when the game is missing, the target module does not
+match the required shape, a feature target cannot be validated, permission is
+denied, or readback verification fails.
 
 ## Permissions And Privacy
 
@@ -211,14 +215,15 @@ swift test \
 Feature changes should follow the manifest-first workflow:
 
 1. Document the target feature in `DaveTrainerManifest`.
-2. Add tests for unsupported build, target mismatch, write failure, verify
-   failure, and success.
-3. Implement the smallest exact patch point or runtime object path.
+2. Add tests for unknown-build feature validation, target mismatch, write
+   failure, verify failure, and success.
+3. Implement the smallest validated patch point or runtime object path.
 4. Keep game-specific addresses and offsets in this project.
 5. Keep development discovery code behind explicit diagnostics.
 
-Do not add mock success paths, broad compatibility guesses, runtime scanning
-fallbacks, or player buttons that rely on unreviewed discovery output.
+Do not add mock success paths, unverified compatibility guesses, unbounded
+runtime scanning fallbacks, or player buttons that rely on unreviewed discovery
+output.
 
 ## Documentation
 

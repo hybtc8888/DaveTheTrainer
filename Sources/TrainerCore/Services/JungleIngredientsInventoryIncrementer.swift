@@ -61,7 +61,6 @@ public struct JungleIngredientsInventoryIncrementResult: Sendable, Equatable {
 
 private struct CachedGameAssembly {
     let processID: Int32
-    let buildGUID: String
     let module: LoadedMachOModule
 }
 
@@ -165,15 +164,13 @@ public final class JungleIngredientsInventoryIncrementer {
     private func resolveGameAssembly(session: JungleIngredientsInventoryMemorySession) throws -> LoadedMachOModule {
         let processID = session.runtimeProcessID
         if let cachedGameAssembly,
-           cachedGameAssembly.processID == processID,
-           cachedGameAssembly.buildGUID == KnownGameBuild.current.buildGUID {
+           cachedGameAssembly.processID == processID {
             return cachedGameAssembly.module
         }
 
         let module = try moduleResolver.resolveGameAssembly(session: session)
         cachedGameAssembly = CachedGameAssembly(
             processID: processID,
-            buildGUID: KnownGameBuild.current.buildGUID,
             module: module
         )
         return module
@@ -186,7 +183,7 @@ public final class JungleIngredientsInventoryIncrementer {
     ) -> RuntimeAddressCacheKey {
         RuntimeAddressCacheKey(
             processID: session.runtimeProcessID,
-            buildGUID: KnownGameBuild.current.buildGUID,
+            buildFingerprint: module.moduleIdentity,
             moduleBaseAddress: module.baseAddress,
             moduleIdentity: module.moduleIdentity,
             featureID: featureID

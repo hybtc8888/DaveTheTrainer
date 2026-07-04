@@ -11,4 +11,7 @@ Do not commit:
 - `.codex/` or `.agents/` local environment files.
 - Local app bundles, zips, logs, or signing artifacts.
 
-Discovery work should produce reviewed manifest entries and tests, not player-runtime scanning fallback.
+Discovery work should produce reviewed manifest entries and tests. Unbounded
+player-runtime scanning is not allowed; bounded, feature-scoped,
+verification-backed runtime resolution is allowed only when documented in the
+manifest and covered by tests.

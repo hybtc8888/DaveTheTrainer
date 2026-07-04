@@ -108,10 +108,6 @@ final class TrainerOperationService {
     }
 
     func apply(_ request: TrainerOperationRequest, context: TrainerOperationContext) throws -> DaveTrainerOperationResult {
-        if let buildResult = buildGateResult(featureID: request.featureID, gameBuild: context.gameBuild) {
-            return buildResult
-        }
-
         guard let feature = manifest.feature(id: request.featureID) else {
             return result(OperationResultDraft(
                 featureID: request.featureID,
@@ -133,19 +129,6 @@ final class TrainerOperationService {
         return try applyValidated(request, context: context, feature: feature)
     }
 
-    func buildGateResult(featureID: DaveTrainerFeatureID, gameBuild: GameBuildSignature) -> DaveTrainerOperationResult? {
-        guard gameBuild == manifest.gameBuild else {
-            return result(OperationResultDraft(
-                featureID: featureID,
-                state: .unsupportedBuild,
-                targets: [],
-                message: "游戏版本不匹配。期望 \(manifest.gameBuild.version) / \(manifest.gameBuild.buildGUID)，实际 \(gameBuild.version) / \(gameBuild.buildGUID)。"
-            ))
-        }
-
-        return nil
-    }
-
     private func applyValidated(
         _ request: TrainerOperationRequest,
         context: TrainerOperationContext,
@@ -156,22 +139,31 @@ final class TrainerOperationService {
             guard feature.kind == .codePatch else {
                 return targetMismatchResult(featureID: request.featureID, message: "功能不是静态 patch：\(request.featureID.rawValue)。")
             }
-            return applySinglePatch(patchID: patchID, request: request, context: context)
+            guard let mismatch = staticPatchTargetMismatch(patchIDs: [patchID], feature: feature) else {
+                return applySinglePatch(patchID: patchID, request: request, context: context)
+            }
+            return mismatch
         case .staticPatchGroup(let patchIDs):
             guard feature.kind == .codePatch else {
                 return targetMismatchResult(featureID: request.featureID, message: "功能不是静态 patch group：\(request.featureID.rawValue)。")
             }
-            return applyPatchGroup(patchIDs: patchIDs, request: request, context: context)
+            guard let mismatch = staticPatchTargetMismatch(patchIDs: patchIDs, feature: feature) else {
+                return applyPatchGroup(patchIDs: patchIDs, request: request, context: context)
+            }
+            return mismatch
         case .valuePatch(let patchID, let valueText):
             guard feature.kind == .codePatch else {
                 return targetMismatchResult(featureID: request.featureID, message: "功能不是静态 value patch：\(request.featureID.rawValue)。")
             }
-            return try applyValuePatch(ValuePatchOperation(
-                patchID: patchID,
-                valueText: valueText,
-                request: request,
-                context: context
-            ))
+            guard let mismatch = staticPatchTargetMismatch(patchIDs: [patchID], feature: feature) else {
+                return try applyValuePatch(ValuePatchOperation(
+                    patchID: patchID,
+                    valueText: valueText,
+                    request: request,
+                    context: context
+                ))
+            }
+            return mismatch
         case .runtimeQuantity(let resourceID, let valueText):
             return applyRuntimeQuantity(resourceID: resourceID, valueText: valueText, request: request, context: context, feature: feature)
         case .inventory(let scope, let valueText):
@@ -179,6 +171,49 @@ final class TrainerOperationService {
         case .jungleInventory(let scope, let valueText):
             return applyJungleInventory(scope: scope, valueText: valueText, request: request, context: context, feature: feature)
         }
+    }
+
+    private func staticPatchTargetMismatch(
+        patchIDs: [String],
+        feature: DaveTrainerManifestFeature
+    ) -> DaveTrainerOperationResult? {
+        guard !patchIDs.isEmpty else {
+            return targetMismatchResult(featureID: feature.id, message: "静态 patch 请求为空：\(feature.id.rawValue)。")
+        }
+        let allowedPatchIDs = Self.allowedStaticPatchIDs(for: feature)
+        guard !allowedPatchIDs.isEmpty else {
+            return targetMismatchResult(featureID: feature.id, message: "manifest 功能缺少静态 patch target：\(feature.id.rawValue)。")
+        }
+        let mismatchedPatchIDs = patchIDs.filter { !allowedPatchIDs.contains($0) }
+        guard mismatchedPatchIDs.isEmpty else {
+            return targetMismatchResult(
+                featureID: feature.id,
+                message: "请求 patch 不属于功能 \(feature.id.rawValue)：\(mismatchedPatchIDs.joined(separator: ", "))。"
+            )
+        }
+        return nil
+    }
+
+    private static func allowedStaticPatchIDs(for feature: DaveTrainerManifestFeature) -> Set<String> {
+        Set(feature.targets.compactMap(staticPatchID))
+    }
+
+    private static func staticPatchID(from target: DaveTrainerManifestTarget) -> String? {
+        guard case .patchPoint(let patchPoint) = target else {
+            return nil
+        }
+        return patchID(fromPatchPointID: patchPoint.id)
+    }
+
+    private static func patchID(fromPatchPointID patchPointID: String) -> String {
+        guard let separatorIndex = patchPointID.lastIndex(of: ".") else {
+            return patchPointID
+        }
+        let suffixIndex = patchPointID.index(after: separatorIndex)
+        guard Int(patchPointID[suffixIndex...]) != nil else {
+            return patchPointID
+        }
+        return String(patchPointID[..<separatorIndex])
     }
 
     private func applySinglePatch(

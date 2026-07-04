@@ -54,7 +54,7 @@ public struct DaveTrainerPlayerRuntimePolicy: Equatable, Codable, Sendable {
     public static let playerManifestOnly = DaveTrainerPlayerRuntimePolicy(
         allowRuntimeScanning: false,
         failureMode: .failLoud,
-        requiresBuildMatch: true
+        requiresBuildMatch: false
     )
 }
 

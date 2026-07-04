@@ -67,10 +67,11 @@ enum RuntimeCommandLineTool {
     }
 
     private static func resolveGameProcess() throws -> TargetProcess {
+        let install = try GameInstallResolver().resolveInstalledGame()
         let request = ProcessResolveRequest(
-            bundleID: KnownGameBuild.current.bundleID,
+            bundleID: install.signature.bundleID,
             executableName: gameExecutableName,
-            executablePath: KnownGameBuild.current.executablePath
+            executablePath: install.signature.executablePath
         )
         return try LibProcProcessResolver().resolve(request)
     }
