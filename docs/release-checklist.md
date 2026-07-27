@@ -13,7 +13,7 @@
 - Verify `Info.plist` has version, build, git commit, build date, bundle id, and manifest schema.
 - Verify `codesign --verify --deep --strict`.
 - Verify zip contents do not contain `._*` or `.DS_Store`.
-- Test the zipped app, not only the local build folder.
+- Test the zipped app from a temporary directory outside File Provider-backed workspaces.
 
 ## Player Scenarios
 

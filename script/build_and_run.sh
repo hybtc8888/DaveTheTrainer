@@ -19,7 +19,7 @@ DEFAULT_LOCAL_APP_DIR="${HOME:?HOME is required}/Applications"
 LOCAL_APP_DIR="${DAVE_TRAINER_LOCAL_APP_DIR:-$DEFAULT_LOCAL_APP_DIR}"
 LOCAL_APP_BUNDLE="$LOCAL_APP_DIR/$APP_NAME.app"
 STAGE_DIR="$ROOT_DIR/.build/release-bundle-stage"
-ZIP_VERIFY_DIR="$ROOT_DIR/.build/release-zip-verify"
+ZIP_VERIFY_DIR=""
 STAGE_BUNDLE="$STAGE_DIR/$APP_NAME.app"
 APP_CONTENTS="$STAGE_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
@@ -30,6 +30,14 @@ APP_ICON_SOURCE="$ROOT_DIR/Assets/AppIcon/DaveTheTrainer.icns"
 APP_ICON_NAME="DaveTheTrainer"
 METADATA_SETTLE_SECONDS="1"
 IS_RELEASE_PACKAGE=0
+
+cleanup() {
+  if [[ "$ZIP_VERIFY_DIR" != "" ]]; then
+    rm -rf "$ZIP_VERIFY_DIR"
+  fi
+}
+
+trap cleanup EXIT
 
 case "$MODE" in
   --release-package|release-package)
@@ -117,8 +125,7 @@ verify_project_zip() {
     exit 1
   fi
 
-  rm -rf "$ZIP_VERIFY_DIR"
-  mkdir -p "$ZIP_VERIFY_DIR"
+  ZIP_VERIFY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/davetrainer-release-verify.XXXXXX")"
   /usr/bin/ditto -x -k "$APP_ZIP" "$ZIP_VERIFY_DIR"
   /usr/bin/codesign --verify --deep --strict "$ZIP_VERIFY_DIR/$APP_NAME.app"
 }

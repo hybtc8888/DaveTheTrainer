@@ -10,6 +10,7 @@
 - Reject ambiguous same-name processes and clear stale attach sessions when the target changes.
 - Distinguish `Game Not Running` from `Install Not Resolved` in the player UI.
 - Embed package version, build number, git commit, and build date in release metadata.
+- Verify release ZIPs outside File Provider-backed workspaces to prevent metadata races.
 
 ## v0.1.1 - 2026-07-04
 
