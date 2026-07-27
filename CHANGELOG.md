@@ -12,6 +12,7 @@
 - Embed package version, build number, git commit, and build date in release metadata.
 - Verify release ZIPs outside File Provider-backed workspaces to prevent metadata races.
 - Generate a portable SHA-256 file that can be verified beside the downloaded ZIP.
+- Update CI checkout to the current Node.js runtime.
 
 ## v0.1.1 - 2026-07-04
 
