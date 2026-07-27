@@ -58,9 +58,17 @@ final class ReleaseScriptPolicyTests: XCTestCase {
         XCTAssertTrue(script.contains("DEFAULT_LOCAL_APP_DIR=\"${HOME:?HOME is required}/Applications\""))
         XCTAssertTrue(script.contains("LOCAL_APP_DIR=\"${DAVE_TRAINER_LOCAL_APP_DIR:-$DEFAULT_LOCAL_APP_DIR}\""))
         XCTAssertTrue(script.contains("DIST_DIR=\"$ROOT_DIR/dist\""))
-        XCTAssertTrue(script.contains("APP_ZIP=\"$DIST_DIR/$APP_NAME-v$APP_VERSION-macOS.zip\""))
+        XCTAssertTrue(script.contains("APP_ZIP=\"$DIST_DIR/$APP_ZIP_FILE_NAME\""))
         XCTAssertTrue(script.contains("STAGE_DIR=\"$ROOT_DIR/.build/release-bundle-stage\""))
         XCTAssertFalse(script.contains("/private/tmp/$APP_NAME"))
+    }
+
+    func testReleaseChecksumUsesPortableAssetNameAndVerifiesIt() throws {
+        let script = try Self.readProjectFile("script/build_and_run.sh")
+
+        XCTAssertTrue(script.contains("APP_ZIP_FILE_NAME=\"$APP_NAME-v$APP_VERSION-macOS.zip\""))
+        XCTAssertTrue(script.contains("/usr/bin/shasum -a 256 \"$APP_ZIP_FILE_NAME\""))
+        XCTAssertTrue(script.contains("/usr/bin/shasum -a 256 -c"))
     }
 
     func testPlayerFooterUsesPackagedVersionMetadata() throws {

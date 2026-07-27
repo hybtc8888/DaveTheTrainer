@@ -14,6 +14,7 @@
 - Verify `codesign --verify --deep --strict`.
 - Verify zip contents do not contain `._*` or `.DS_Store`.
 - Test the zipped app from a temporary directory outside File Provider-backed workspaces.
+- Verify the `.sha256` asset references only the ZIP file name, not a local build path.
 
 ## Player Scenarios
 

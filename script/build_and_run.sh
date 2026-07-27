@@ -14,7 +14,9 @@ GIT_COMMIT="${DAVE_TRAINER_GIT_COMMIT:-$(git -C "$ROOT_DIR" rev-parse --short=12
 BUILD_DATE="${DAVE_TRAINER_BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
-APP_ZIP="$DIST_DIR/$APP_NAME-v$APP_VERSION-macOS.zip"
+APP_ZIP_FILE_NAME="$APP_NAME-v$APP_VERSION-macOS.zip"
+APP_ZIP="$DIST_DIR/$APP_ZIP_FILE_NAME"
+APP_SHA256="$APP_ZIP.sha256"
 DEFAULT_LOCAL_APP_DIR="${HOME:?HOME is required}/Applications"
 LOCAL_APP_DIR="${DAVE_TRAINER_LOCAL_APP_DIR:-$DEFAULT_LOCAL_APP_DIR}"
 LOCAL_APP_BUNDLE="$LOCAL_APP_DIR/$APP_NAME.app"
@@ -130,6 +132,14 @@ verify_project_zip() {
   /usr/bin/codesign --verify --deep --strict "$ZIP_VERIFY_DIR/$APP_NAME.app"
 }
 
+create_project_checksum() {
+  (
+    cd "$DIST_DIR"
+    /usr/bin/shasum -a 256 "$APP_ZIP_FILE_NAME" >"$(basename "$APP_SHA256")"
+    /usr/bin/shasum -a 256 -c "$(basename "$APP_SHA256")"
+  )
+}
+
 SIGN_IDENTITY="$(resolve_sign_identity)"
 echo "Signing identity: $SIGN_IDENTITY" >&2
 
@@ -193,6 +203,7 @@ copy_signed_app "$STAGE_BUNDLE" "$LOCAL_APP_BUNDLE"
 copy_icloud_dist_app
 create_project_zip
 verify_project_zip
+create_project_checksum
 
 open_app() {
   /usr/bin/open -n "$LOCAL_APP_BUNDLE"
