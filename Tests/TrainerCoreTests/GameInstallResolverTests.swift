@@ -1,7 +1,7 @@
 import XCTest
 @testable import TrainerCore
 
-final class GameInstallResolverTests: XCTestCase {
+final class InstalledGameIntegrationTests: XCTestCase {
     func testInstalledDaveTheDiverSatisfiesAdaptiveHardRequirements() throws {
         let resolver = GameInstallResolver()
 
@@ -15,6 +15,16 @@ final class GameInstallResolverTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: Self.gameAssemblyPath(for: install.signature)))
     }
 
+    private static func gameAssemblyPath(for signature: GameBuildSignature) -> String {
+        URL(fileURLWithPath: signature.executablePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Frameworks/GameAssembly.dylib")
+            .path
+    }
+}
+
+final class GameInstallResolverTests: XCTestCase {
     func testResolverAcceptsDaveInstallWithoutVersionOrBootConfig() throws {
         let fixture = try TemporaryDaveInstallFixture(options: .withoutVersionOrBootConfig())
         defer { fixture.remove() }
@@ -47,6 +57,43 @@ final class GameInstallResolverTests: XCTestCase {
         XCTAssertEqual(install.signature.buildGUID, "test-guid")
     }
 
+    func testResolverUsesRunningProcessPathOutsideConfiguredInstallLocation() throws {
+        let fixture = try TemporaryDaveInstallFixture(options: .standard)
+        defer { fixture.remove() }
+        let resolver = GameInstallResolver(
+            defaultOuterAppURL: URL(fileURLWithPath: "/Applications/DefinitelyMissingDave.app")
+        )
+
+        let install = try resolver.resolveRunningGame(fixture.targetProcess)
+
+        XCTAssertEqual(install.outerAppURL.standardizedFileURL, fixture.outerAppURL.standardizedFileURL)
+        XCTAssertEqual(install.innerAppURL.standardizedFileURL, fixture.innerAppURL.standardizedFileURL)
+        XCTAssertEqual(install.signature.executablePath, fixture.executableURL.path)
+    }
+
+    func testResolverUsesStandaloneUnityBundleFromRunningProcess() throws {
+        let fixture = try TemporaryDaveInstallFixture(options: .standalone)
+        defer { fixture.remove() }
+
+        let install = try fixture.resolver.resolveRunningGame(fixture.targetProcess)
+
+        XCTAssertEqual(install.outerAppURL.standardizedFileURL, fixture.outerAppURL.standardizedFileURL)
+        XCTAssertEqual(install.innerAppURL.standardizedFileURL, fixture.outerAppURL.standardizedFileURL)
+        XCTAssertEqual(install.signature.executablePath, fixture.executableURL.path)
+    }
+
+    func testResolverRejectsRunningProcessFromNonDaveBundle() throws {
+        let fixture = try TemporaryDaveInstallFixture(options: .nonDaveBundle)
+        defer { fixture.remove() }
+
+        XCTAssertThrowsError(try fixture.resolver.resolveRunningGame(fixture.targetProcess)) { error in
+            guard case TrainerError.targetMismatch = error else {
+                XCTFail("Expected targetMismatch, got \(error)")
+                return
+            }
+        }
+    }
+
     func testResolverRejectsNonDaveBundle() throws {
         let fixture = try TemporaryDaveInstallFixture(options: .nonDaveBundle)
         defer { fixture.remove() }
@@ -68,14 +115,6 @@ final class GameInstallResolverTests: XCTestCase {
         defer { missingMetadata.remove() }
         XCTAssertThrowsError(try missingMetadata.resolver.resolveInstalledGame())
     }
-
-    private static func gameAssemblyPath(for signature: GameBuildSignature) -> String {
-        URL(fileURLWithPath: signature.executablePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Frameworks/GameAssembly.dylib")
-            .path
-    }
 }
 
 private struct TemporaryDaveInstallOptions {
@@ -84,8 +123,15 @@ private struct TemporaryDaveInstallOptions {
     var bootConfigText: String? = "build-guid=test-guid\n"
     var includeGameAssembly = true
     var includeMetadata = true
+    var usesStandaloneBundle = false
 
     static let standard = TemporaryDaveInstallOptions()
+
+    static var standalone: TemporaryDaveInstallOptions {
+        var options = TemporaryDaveInstallOptions()
+        options.usesStandaloneBundle = true
+        return options
+    }
 
     static func withoutVersionOrBootConfig() -> TemporaryDaveInstallOptions {
         var options = TemporaryDaveInstallOptions()
@@ -121,26 +167,35 @@ private struct TemporaryDaveInstallOptions {
 
 private final class TemporaryDaveInstallFixture {
     let resolver: GameInstallResolver
-    private let rootURL: URL
+    let outerAppURL: URL
+    let innerAppURL: URL
+    let executableURL: URL
     private let fileManager: FileManager
 
     init(options: TemporaryDaveInstallOptions, fileManager: FileManager = .default) throws {
         self.fileManager = fileManager
-        self.rootURL = fileManager.temporaryDirectory
+        let outerAppURL = fileManager.temporaryDirectory
             .appendingPathComponent("DaveInstallResolverTests")
             .appendingPathComponent(UUID().uuidString)
             .appendingPathComponent("DaveTheDiver.app")
-        self.resolver = GameInstallResolver(fileManager: fileManager, defaultOuterAppURL: rootURL)
+        self.outerAppURL = outerAppURL
+        self.innerAppURL = options.usesStandaloneBundle
+            ? outerAppURL
+            : outerAppURL.appendingPathComponent("Contents/Game/DaveTheDiver.app")
+        self.executableURL = innerAppURL.appendingPathComponent("Contents/MacOS/DAVE THE DIVER")
+        self.resolver = GameInstallResolver(fileManager: fileManager, defaultOuterAppURL: outerAppURL)
         try makeInstall(options: options)
     }
 
+    var targetProcess: TargetProcess {
+        TargetProcess(pid: 42, name: "DAVE THE DIVER", executablePath: executableURL.path)
+    }
+
     func remove() {
-        try? fileManager.removeItem(at: rootURL.deletingLastPathComponent())
+        try? fileManager.removeItem(at: outerAppURL.deletingLastPathComponent())
     }
 
     private func makeInstall(options: TemporaryDaveInstallOptions) throws {
-        let innerAppURL = rootURL.appendingPathComponent("Contents/Game/DaveTheDiver.app")
-        let executableURL = innerAppURL.appendingPathComponent("Contents/MacOS/DAVE THE DIVER")
         let metadataURL = innerAppURL.appendingPathComponent("Contents/Resources/Data/il2cpp_data/Metadata/global-metadata.dat")
         let gameAssemblyURL = innerAppURL.appendingPathComponent("Contents/Frameworks/GameAssembly.dylib")
         let bootConfigURL = innerAppURL.appendingPathComponent("Contents/Resources/Data/boot.config")
@@ -165,7 +220,10 @@ private final class TemporaryDaveInstallFixture {
     }
 
     private func writeInfoPlist(_ url: URL, options: TemporaryDaveInstallOptions) throws {
-        var plist = ["CFBundleIdentifier": options.bundleID]
+        var plist = [
+            "CFBundleExecutable": "DAVE THE DIVER",
+            "CFBundleIdentifier": options.bundleID
+        ]
         if options.includeVersion {
             plist["CFBundleShortVersionString"] = "v-test"
         }

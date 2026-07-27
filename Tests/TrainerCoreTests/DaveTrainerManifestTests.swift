@@ -28,6 +28,23 @@ final class DaveTrainerManifestTests: XCTestCase {
         XCTAssertEqual(module.pathMatchPolicy, "image-name")
     }
 
+    func testKnownBaselineIdentityDoesNotDependOnInstallLocation() {
+        let relocatedBuild = GameBuildSignature(
+            identity: GameBuildIdentity(
+                bundleID: KnownGameBuild.current.bundleID,
+                version: KnownGameBuild.current.version,
+                buildGUID: KnownGameBuild.current.buildGUID
+            ),
+            paths: GameBuildPaths(
+                executablePath: "/Custom/SteamLibrary/DaveTheDiver.app/Contents/MacOS/DAVE THE DIVER",
+                metadataPath: "/Custom/SteamLibrary/DaveTheDiver.app/Contents/Resources/Data/il2cpp_data/Metadata/global-metadata.dat"
+            )
+        )
+
+        XCTAssertNotEqual(relocatedBuild, KnownGameBuild.current)
+        XCTAssertTrue(relocatedBuild.isKnownBaseline)
+    }
+
     func testStaticPatchManifestEntriesExposeExpectedPatchAndRestoreBytes() throws {
         let manifest = DaveTrainerManifest.current
         let staticFeatures = manifest.features.filter { $0.kind == .codePatch }

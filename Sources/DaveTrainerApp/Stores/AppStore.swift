@@ -119,15 +119,19 @@ final class AppStore: ObservableObject {
     }
 
     func refreshAll() {
-        refreshInstall()
+        refreshGameContext()
         refreshAddressBook()
         refreshSaves()
-        refreshProcess()
     }
 
     func refreshInstall() {
         do {
-            let resolvedInstall = try installResolver.resolveInstalledGame()
+            let resolvedInstall: GameInstall
+            if let targetProcess {
+                resolvedInstall = try installResolver.resolveRunningGame(targetProcess)
+            } else {
+                resolvedInstall = try installResolver.resolveInstalledGame()
+            }
             install = resolvedInstall
             features = DefaultTrainerFeatures.make(requiredBuild: resolvedInstall.signature)
             if resolvedInstall.signature.isKnownBaseline {
@@ -138,6 +142,7 @@ final class AppStore: ObservableObject {
         } catch {
             install = nil
             features = DefaultTrainerFeatures.make(requiredBuild: KnownGameBuild.current)
+            clearAttachment()
             log(error.localizedDescription, isError: true)
         }
     }
@@ -150,13 +155,15 @@ final class AppStore: ObservableObject {
                 executableName: "DAVE THE DIVER",
                 executablePath: signature.executablePath
             )
-            targetProcess = try processResolver.resolve(request)
+            let resolvedProcess = try processResolver.resolve(request)
+            if let targetProcess, targetProcess.pid != resolvedProcess.pid {
+                clearAttachment()
+            }
+            targetProcess = resolvedProcess
             log("已找到进程：PID \(targetProcess?.pid ?? 0)")
         } catch {
             targetProcess = nil
-            isAttached = false
-            session = nil
-            clearRuntimeQuantityCaches()
+            clearAttachment()
             log(error.localizedDescription, isError: true)
         }
     }
@@ -169,24 +176,24 @@ final class AppStore: ObservableObject {
             guard let targetProcess else {
                 throw TrainerError.processNotFound
             }
+            let verifiedInstall = try installResolver.resolveRunningGame(targetProcess)
+            install = verifiedInstall
+            features = DefaultTrainerFeatures.make(requiredBuild: verifiedInstall.signature)
             session = try memoryAccess.attach(to: targetProcess)
             clearRuntimeQuantityCaches()
             isAttached = true
             log("已附加进程：PID \(targetProcess.pid)")
         } catch {
-            isAttached = false
-            session = nil
-            clearRuntimeQuantityCaches()
+            clearAttachment()
             log(error.localizedDescription, isError: true)
         }
     }
 
     func quickPrepare() {
         log("开始一键准备：刷新状态、备份存档、附加进程。")
-        refreshInstall()
+        refreshGameContext()
         refreshAddressBook()
         refreshSaves()
-        refreshProcess()
         createBackup()
         attach()
     }
@@ -506,9 +513,27 @@ final class AppStore: ObservableObject {
 
     private func currentOperationBuild() throws -> GameBuildSignature {
         guard let signature = install?.signature else {
-            throw TrainerError.installNotFound("尚未识别 Dave 安装，禁止执行玩家写入。")
+            let detail = targetProcess == nil
+                ? "尚未找到正在运行的 Dave 进程，禁止执行玩家写入。"
+                : "已找到进程，但无法从其 executable 验证 Dave app bundle，禁止执行玩家写入。"
+            throw TrainerError.installNotFound(detail)
         }
         return signature
+    }
+
+    private func refreshGameContext() {
+        refreshProcess()
+        refreshInstall()
+        guard targetProcess == nil, install != nil else {
+            return
+        }
+        refreshProcess()
+    }
+
+    private func clearAttachment() {
+        isAttached = false
+        session = nil
+        clearRuntimeQuantityCaches()
     }
 
     private func startFreezeOrThrow(_ feature: TrainerFeature, text: String) throws {

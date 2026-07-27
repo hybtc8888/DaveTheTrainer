@@ -38,7 +38,9 @@ public struct GameBuildSignature: Equatable, Codable, Sendable {
     }
 
     public var isKnownBaseline: Bool {
-        self == KnownGameBuild.current
+        bundleID == KnownGameBuild.current.bundleID
+            && version == KnownGameBuild.current.version
+            && buildGUID == KnownGameBuild.current.buildGUID
     }
 
     public var isDaveTheDiverBundle: Bool {

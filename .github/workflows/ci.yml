@@ -20,6 +20,6 @@ jobs:
       - name: Run tests
         run: >
           swift test
-          --skip GameInstallResolverTests
+          --skip InstalledGameIntegrationTests
           --skip Il2CppFeatureLocatorTests
           --skip MachOModuleResolverTests

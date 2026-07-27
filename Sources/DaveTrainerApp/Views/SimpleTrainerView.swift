@@ -25,11 +25,19 @@ private struct SimpleSidePanel: View {
             statusText
             actionButtons
             Spacer()
-            Text("Trainer Version: Local Mac V2 ICache")
+            Text(trainerVersionText)
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.72))
         }
         .padding(22)
+    }
+
+    private var trainerVersionText: String {
+        guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else {
+            return "Trainer Version: development"
+        }
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return "Trainer Version: \(version) (\(build ?? "local"))"
     }
 
     private var statusText: some View {
@@ -134,10 +142,17 @@ private struct SimpleOptionsPanel: View {
                     .foregroundStyle(.white.opacity(0.86))
             }
             Spacer()
-            Text(store.install?.signature.version ?? "Game Not Found")
+            Text(gameStatusText)
                 .font(.headline.monospaced())
                 .foregroundStyle(.white.opacity(0.72))
         }
+    }
+
+    private var gameStatusText: String {
+        if let version = store.install?.signature.version {
+            return version
+        }
+        return store.targetProcess == nil ? "Game Not Running" : "Install Not Resolved"
     }
 }
 

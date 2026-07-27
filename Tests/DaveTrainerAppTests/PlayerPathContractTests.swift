@@ -49,6 +49,27 @@ final class PlayerPathContractTests: XCTestCase {
         XCTAssertEqual(legacyActions.map(\.id), [])
     }
 
+    func testStoreResolvesInstallFromRunningProcessInsteadOfFixedApplicationsPath() {
+        let install = Self.unsupportedInstall
+        let process = TargetProcess(
+            pid: getpid(),
+            name: "DAVE THE DIVER",
+            executablePath: install.signature.executablePath
+        )
+        let installResolver = RunningProcessOnlyGameInstallResolver(install: install)
+
+        let store = AppStore(dependencies: AppStore.Dependencies(
+            installResolver: installResolver,
+            processResolver: FixedProcessResolver(process: process),
+            memoryAccess: CurrentProcessMemoryAccess()
+        ))
+
+        XCTAssertEqual(store.install?.signature, install.signature)
+        XCTAssertEqual(store.targetProcess, process)
+        XCTAssertEqual(installResolver.runningProcessResolveCount, 1)
+        XCTAssertEqual(installResolver.fixedPathResolveCount, 0)
+    }
+
     func testUnknownBuildPatchAttemptsFeatureValidationWithoutMarkingPatchEnabled() async throws {
         let memoryAccess = RecordingMemoryAccess()
         let store = AppStore(dependencies: .test(install: Self.unsupportedInstall, memoryAccess: memoryAccess))
@@ -159,18 +180,55 @@ private struct FixedGameInstallResolver: GameInstallResolving {
         install
     }
 
+    func resolveRunningGame(_ process: TargetProcess) throws -> GameInstall {
+        install
+    }
+
     func validateCurrentInstall() throws -> GameInstall {
         install
     }
 }
 
 private struct FixedProcessResolver: ProcessResolving {
+    let process: TargetProcess?
+
+    init(process: TargetProcess? = nil) {
+        self.process = process
+    }
+
     func resolve(_ request: ProcessResolveRequest) throws -> TargetProcess {
-        TargetProcess(
+        if let process {
+            return process
+        }
+        return TargetProcess(
             pid: getpid(),
             name: "DAVE THE DIVER",
             executablePath: request.executablePath
         )
+    }
+}
+
+private final class RunningProcessOnlyGameInstallResolver: GameInstallResolving {
+    let install: GameInstall
+    private(set) var runningProcessResolveCount = 0
+    private(set) var fixedPathResolveCount = 0
+
+    init(install: GameInstall) {
+        self.install = install
+    }
+
+    func resolveInstalledGame() throws -> GameInstall {
+        fixedPathResolveCount += 1
+        throw TrainerError.installNotFound("fixed path should not be used")
+    }
+
+    func resolveRunningGame(_ process: TargetProcess) throws -> GameInstall {
+        runningProcessResolveCount += 1
+        return install
+    }
+
+    func validateCurrentInstall() throws -> GameInstall {
+        install
     }
 }
 

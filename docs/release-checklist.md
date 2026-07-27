@@ -10,7 +10,7 @@
 ## Artifact
 
 - Verify the `.app` has `Contents/MacOS/DaveTheTrainer`.
-- Verify `Info.plist` has version, build, bundle id, and manifest schema.
+- Verify `Info.plist` has version, build, git commit, build date, bundle id, and manifest schema.
 - Verify `codesign --verify --deep --strict`.
 - Verify zip contents do not contain `._*` or `.DS_Store`.
 - Test the zipped app, not only the local build folder.

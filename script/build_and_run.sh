@@ -5,14 +5,16 @@ MODE="${1:-run}"
 APP_NAME="DaveTheTrainer"
 BUNDLE_ID="${DAVE_TRAINER_BUNDLE_ID:-com.github.davethetrainer.DaveTheTrainer}"
 MIN_SYSTEM_VERSION="14.0"
-APP_VERSION="${DAVE_TRAINER_VERSION:-1.0.0}"
-APP_BUILD_VERSION="${DAVE_TRAINER_BUILD_VERSION:-local}"
+APP_VERSION="${DAVE_TRAINER_VERSION:-0.1.2}"
+APP_BUILD_VERSION="${DAVE_TRAINER_BUILD_VERSION:-3}"
 MANIFEST_SCHEMA_VERSION="1.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+GIT_COMMIT="${DAVE_TRAINER_GIT_COMMIT:-$(git -C "$ROOT_DIR" rev-parse --short=12 HEAD)}"
+BUILD_DATE="${DAVE_TRAINER_BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
-APP_ZIP="$DIST_DIR/$APP_NAME.zip"
+APP_ZIP="$DIST_DIR/$APP_NAME-v$APP_VERSION-macOS.zip"
 DEFAULT_LOCAL_APP_DIR="${HOME:?HOME is required}/Applications"
 LOCAL_APP_DIR="${DAVE_TRAINER_LOCAL_APP_DIR:-$DEFAULT_LOCAL_APP_DIR}"
 LOCAL_APP_BUNDLE="$LOCAL_APP_DIR/$APP_NAME.app"
@@ -166,6 +168,10 @@ cat >"$INFO_PLIST" <<PLIST
   <string>$APP_BUILD_VERSION</string>
   <key>DaveTrainerManifestSchemaVersion</key>
   <string>$MANIFEST_SCHEMA_VERSION</string>
+  <key>DaveTrainerGitCommit</key>
+  <string>$GIT_COMMIT</string>
+  <key>DaveTrainerBuildDate</key>
+  <string>$BUILD_DATE</string>
   <key>LSMinimumSystemVersion</key>
   <string>$MIN_SYSTEM_VERSION</string>
   <key>NSPrincipalClass</key>

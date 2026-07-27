@@ -10,6 +10,10 @@ final class ReleaseScriptPolicyTests: XCTestCase {
         XCTAssertTrue(script.contains("/usr/bin/ditto --norsrc -c -k --keepParent"))
         XCTAssertTrue(script.contains("CFBundleShortVersionString"))
         XCTAssertTrue(script.contains("DaveTrainerManifestSchemaVersion"))
+        XCTAssertTrue(script.contains("DaveTrainerGitCommit"))
+        XCTAssertTrue(script.contains("DaveTrainerBuildDate"))
+        XCTAssertTrue(script.contains("APP_VERSION=\"${DAVE_TRAINER_VERSION:-0.1.2}\""))
+        XCTAssertTrue(script.contains("APP_BUILD_VERSION=\"${DAVE_TRAINER_BUILD_VERSION:-3}\""))
     }
 
     func testReleasePackageUsesReleaseBuildAndRequiresExplicitSigningIdentity() throws {
@@ -53,9 +57,17 @@ final class ReleaseScriptPolicyTests: XCTestCase {
         XCTAssertTrue(script.contains("DEFAULT_LOCAL_APP_DIR=\"${HOME:?HOME is required}/Applications\""))
         XCTAssertTrue(script.contains("LOCAL_APP_DIR=\"${DAVE_TRAINER_LOCAL_APP_DIR:-$DEFAULT_LOCAL_APP_DIR}\""))
         XCTAssertTrue(script.contains("DIST_DIR=\"$ROOT_DIR/dist\""))
-        XCTAssertTrue(script.contains("APP_ZIP=\"$DIST_DIR/$APP_NAME.zip\""))
+        XCTAssertTrue(script.contains("APP_ZIP=\"$DIST_DIR/$APP_NAME-v$APP_VERSION-macOS.zip\""))
         XCTAssertTrue(script.contains("STAGE_DIR=\"$ROOT_DIR/.build/release-bundle-stage\""))
         XCTAssertFalse(script.contains("/private/tmp/$APP_NAME"))
+    }
+
+    func testPlayerFooterUsesPackagedVersionMetadata() throws {
+        let source = try Self.readProjectFile("Sources/DaveTrainerApp/Views/SimpleTrainerView.swift")
+
+        XCTAssertFalse(source.contains("Local Mac V2 ICache"))
+        XCTAssertTrue(source.contains("CFBundleShortVersionString"))
+        XCTAssertTrue(source.contains("CFBundleVersion"))
     }
 
     func testPasswordlessAdminScriptDoesNotInstallBroadGuiSudoersRule() throws {

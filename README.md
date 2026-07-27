@@ -48,7 +48,7 @@ release notes before running the app.
 
 Install from a release zip:
 
-1. Download `DaveTheTrainer-v0.1.0-macOS.zip` from the latest release.
+1. Download `DaveTheTrainer-v0.1.2-macOS.zip` from the latest release.
 2. Unzip it.
 3. Move `DaveTheTrainer.app` to `/Applications` or `$HOME/Applications`.
 4. Start the supported macOS build of `DAVE THE DIVER`.
@@ -126,7 +126,7 @@ swift test
 `script/build_and_run.sh` builds the SwiftPM executable, stages a real
 `DaveTheTrainer.app` bundle, signs it, copies the latest app to
 `${DAVE_TRAINER_LOCAL_APP_DIR:-$HOME/Applications}`, mirrors the artifact under
-`dist/`, creates `dist/DaveTheTrainer.zip`, and launches the app.
+`dist/`, creates `dist/DaveTheTrainer-v0.1.2-macOS.zip`, and launches the app.
 
 To choose a different local app destination:
 
@@ -160,6 +160,18 @@ DAVE_TRAINER_SIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
 4. Apply only the one-click trainer operation you intend to use.
 5. If macOS asks for administrator authorization, review the prompt and allow
    it only for the trainer attach/read/write operation.
+
+The trainer derives the actual `.app` from the running game executable first,
+so Steam custom libraries, locations outside `/Applications`, and standalone
+Unity app bundles are supported. A name-matched process remains only a
+candidate: `CFBundleExecutable`, `com.nexon.dave`, IL2CPP metadata, and
+`GameAssembly.dylib` must still validate before attach. The fixed
+`/Applications/DaveTheDiver.app` location is checked only when the game is not
+running.
+
+`Install Not Resolved` means that a process was found but its app bundle did
+not pass installation validation. It is distinct from `Game Not Running` and
+does not by itself mean that the version number is unsupported.
 
 The app should fail loudly when the game is missing, the target module does not
 match the required shape, a feature target cannot be validated, permission is
@@ -207,7 +219,7 @@ local `DAVE THE DIVER` installation or extracted proprietary game files:
 
 ```bash
 swift test \
-  --skip GameInstallResolverTests \
+  --skip InstalledGameIntegrationTests \
   --skip Il2CppFeatureLocatorTests \
   --skip MachOModuleResolverTests
 ```

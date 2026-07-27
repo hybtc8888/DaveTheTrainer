@@ -44,7 +44,7 @@ Mach-O 模块形态、确定的补丁点或运行时对象路径。`v1.0.6.675.m
 
 安装步骤：
 
-1. 从最新 Release 下载 `DaveTheTrainer-v0.1.0-macOS.zip`。
+1. 从最新 Release 下载 `DaveTheTrainer-v0.1.2-macOS.zip`。
 2. 解压 zip。
 3. 把 `DaveTheTrainer.app` 移动到 `/Applications` 或 `$HOME/Applications`。
 4. 启动 macOS 版 `DAVE THE DIVER`。
@@ -85,6 +85,15 @@ xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
 4. 只点击你确实要使用的一键功能。
 5. 如果 macOS 请求管理员权限，请确认它只用于目标进程 attach/read/write 操作。
 
+修改器会优先从正在运行的游戏进程反向定位实际 `.app`，因此支持 Steam 自定义库、
+非 `/Applications` 安装目录和直接运行的 Unity app bundle。进程只按名称找到时仍只是候选；
+attach 前必须继续通过 `CFBundleExecutable`、`com.nexon.dave`、IL2CPP metadata 和
+`GameAssembly.dylib` 校验。只有游戏未运行时，才会检查默认的
+`/Applications/DaveTheDiver.app`。
+
+界面显示 `Install Not Resolved` 表示进程已找到，但其 app bundle 未通过上述安装校验；
+这与 `Game Not Running` 不同，也不代表版本号本身不受支持。
+
 当游戏未运行、目标模块形态不匹配、功能目标校验失败、权限被拒绝或写后校验失败时，
 应用应该明确报错。
 
@@ -111,13 +120,13 @@ swift test
 `script/build_and_run.sh` 会构建 SwiftPM executable，生成真实的
 `DaveTheTrainer.app` bundle，签名，复制到
 `${DAVE_TRAINER_LOCAL_APP_DIR:-$HOME/Applications}`，同时在 `dist/` 下生成
-`DaveTheTrainer.zip`。
+`DaveTheTrainer-v0.1.2-macOS.zip`。
 
 GitHub Actions 运行公开测试套件，并跳过需要本机游戏安装或专有游戏文件的测试：
 
 ```bash
 swift test \
-  --skip GameInstallResolverTests \
+  --skip InstalledGameIntegrationTests \
   --skip Il2CppFeatureLocatorTests \
   --skip MachOModuleResolverTests
 ```

@@ -10,11 +10,25 @@ public final class LibProcProcessResolver: ProcessResolving {
     public init() {}
 
     public func resolve(_ request: ProcessResolveRequest) throws -> TargetProcess {
-        let processes = try listProcesses()
-        guard let process = processes.first(where: { matches($0, request: request) }) else {
+        try Self.selectProcess(from: listProcesses(), request: request)
+    }
+
+    static func selectProcess(from processes: [TargetProcess], request: ProcessResolveRequest) throws -> TargetProcess {
+        let exactPathMatches = processes.filter {
+            canonicalPath($0.executablePath) == canonicalPath(request.executablePath)
+        }
+        if !exactPathMatches.isEmpty {
+            return try uniqueProcess(from: exactPathMatches)
+        }
+
+        let nameMatches = processes.filter { process in
+            process.name == request.executableName
+                || URL(fileURLWithPath: process.executablePath).lastPathComponent == request.executableName
+        }
+        guard !nameMatches.isEmpty else {
             throw TrainerError.processNotFound
         }
-        return process
+        return try uniqueProcess(from: nameMatches)
     }
 
     public func listProcesses() throws -> [TargetProcess] {
@@ -72,8 +86,16 @@ public final class LibProcProcessResolver: ProcessResolving {
         return String(cString: buffer)
     }
 
-    private func matches(_ process: TargetProcess, request: ProcessResolveRequest) -> Bool {
-        process.executablePath == request.executablePath || process.name == request.executableName
+    private static func uniqueProcess(from processes: [TargetProcess]) throws -> TargetProcess {
+        guard processes.count == 1, let process = processes.first else {
+            let processIDs = processes.map { String($0.pid) }.joined(separator: ", ")
+            throw TrainerError.processQueryFailed("发现多个 DAVE THE DIVER 候选进程（PID \(processIDs)），无法安全选择目标。")
+        }
+        return process
+    }
+
+    private static func canonicalPath(_ path: String) -> String {
+        URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
     }
 
     private func doubled(_ value: Int) throws -> Int {
