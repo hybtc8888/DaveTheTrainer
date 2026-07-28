@@ -22,32 +22,18 @@ public struct LoadedMachOModule: Equatable, Sendable {
     public let baseAddress: UInt64
     public let headerSize: Int
     public let moduleIdentity: String
-    public let identityValidation: ModuleIdentityValidation
 
     public init(
         name: String,
         baseAddress: UInt64,
         headerSize: Int,
-        moduleIdentity: String? = nil,
-        identityValidation: ModuleIdentityValidation = .notConfigured
+        moduleIdentity: String? = nil
     ) {
         self.name = name
         self.baseAddress = baseAddress
         self.headerSize = headerSize
         self.moduleIdentity = moduleIdentity ?? name
-        self.identityValidation = identityValidation
     }
-}
-
-public enum ModuleIdentityValidationPolicy: Equatable, Sendable {
-    case adaptive
-    case strict
-}
-
-public enum ModuleIdentityValidation: Equatable, Sendable {
-    case notConfigured
-    case matched
-    case uuidMismatch(expected: String, actual: String?)
 }
 
 public protocol ModuleMemorySession: AnyObject {
@@ -63,14 +49,9 @@ public protocol GameAssemblyResolving {
 
 public final class MachOModuleResolver: GameAssemblyResolving {
     private let expectedModuleIdentity: DaveModuleIdentity?
-    private let validationPolicy: ModuleIdentityValidationPolicy
 
-    public init(
-        expectedModuleIdentity: DaveModuleIdentity? = nil,
-        validationPolicy: ModuleIdentityValidationPolicy = .adaptive
-    ) {
+    public init(expectedModuleIdentity: DaveModuleIdentity? = nil) {
         self.expectedModuleIdentity = expectedModuleIdentity
-        self.validationPolicy = validationPolicy
     }
 
     public func resolveGameAssembly(session: ModuleMemorySession) throws -> LoadedMachOModule {
@@ -100,13 +81,12 @@ public final class MachOModuleResolver: GameAssemblyResolving {
         }
 
         let identity = Self.moduleIdentity(in: data)
-        let validation = try validateExpectedModuleIdentity(identity)
+        try validateExpectedModuleIdentity(identity)
         return LoadedMachOModule(
             name: gameAssemblyImageName,
             baseAddress: region.address,
             headerSize: readSize,
-            moduleIdentity: identity.cacheKey,
-            identityValidation: validation
+            moduleIdentity: identity.cacheKey
         )
     }
 
@@ -226,9 +206,9 @@ public final class MachOModuleResolver: GameAssemblyResolving {
         return "\(hex[0...3].joined())-\(hex[4...5].joined())-\(hex[6...7].joined())-\(hex[8...9].joined())-\(hex[10...15].joined())"
     }
 
-    private func validateExpectedModuleIdentity(_ actual: LoadedMachOModuleIdentity) throws -> ModuleIdentityValidation {
+    private func validateExpectedModuleIdentity(_ actual: LoadedMachOModuleIdentity) throws {
         guard let expectedModuleIdentity else {
-            return .notConfigured
+            return
         }
         guard expectedModuleIdentity.moduleName == actual.moduleName else {
             throw TrainerError.targetMismatch("GameAssembly 模块名不匹配。期望 \(expectedModuleIdentity.moduleName)，实际 \(actual.moduleName)。")
@@ -237,17 +217,13 @@ public final class MachOModuleResolver: GameAssemblyResolving {
             throw TrainerError.targetMismatch("GameAssembly 架构不匹配。期望 \(expectedModuleIdentity.architecture)，实际 \(actual.architecture)。")
         }
         guard let expectedUUID = expectedModuleIdentity.machoUUID else {
-            return .matched
+            return
         }
-        guard actual.machoUUID != expectedUUID else {
-            return .matched
+        guard actual.machoUUID == expectedUUID else {
+            throw TrainerError.targetMismatch(
+                "GameAssembly UUID 不匹配。期望 \(expectedUUID)，实际 \(actual.machoUUID ?? moduleIdentityUnknownUUID)。"
+            )
         }
-
-        guard validationPolicy == .adaptive else {
-            throw TrainerError.targetMismatch("GameAssembly UUID 不匹配。期望 \(expectedUUID)，实际 \(actual.machoUUID ?? moduleIdentityUnknownUUID)。")
-        }
-
-        return .uuidMismatch(expected: expectedUUID, actual: actual.machoUUID)
     }
 }
 

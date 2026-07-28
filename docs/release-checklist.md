@@ -21,7 +21,8 @@
 - Game not running.
 - Permission denied.
 - Permission granted.
-- Unknown game build with feature-level validation failure.
+- Unknown game build rejected before player memory writes.
+- Compatibility report export with no absolute paths or full symbol names.
 - Supported build with a reversible patch.
 - Inventory operation with missing entry.
 - Uninstall path.

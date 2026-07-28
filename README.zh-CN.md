@@ -15,8 +15,8 @@
 
 DaveTheTrainer 是一个原生 macOS SwiftUI 修改器。它不是通用内存扫描器，也不是
 Cheat Engine 风格工具。玩家按钮都绑定到已审查的 manifest feature、已验证的
-Mach-O 模块形态、确定的补丁点或运行时对象路径。`v1.0.6.675.mac` 是已完整验证的
-基线 profile，不是全局兼容性开关。
+Mach-O 模块形态、确定的补丁点或运行时对象路径。安装路径可以变化，但玩家内存写入
+必须匹配经过审核的精确构建 profile。`v1.0.6.675.mac` 是当前已完整验证的 profile。
 
 > 本项目与 MINTROCKET、Nexon 或 `DAVE THE DIVER` 创作者没有隶属、赞助、
 > 背书或官方合作关系。
@@ -44,7 +44,7 @@ Mach-O 模块形态、确定的补丁点或运行时对象路径。`v1.0.6.675.m
 
 安装步骤：
 
-1. 从最新 Release 下载 `DaveTheTrainer-v0.1.2-macOS.zip`。
+1. 从最新 Release 下载 `DaveTheTrainer-v0.1.3-macOS.zip`。
 2. 解压 zip。
 3. 把 `DaveTheTrainer.app` 移动到 `/Applications` 或 `$HOME/Applications`。
 4. 启动 macOS 版 `DAVE THE DIVER`。
@@ -58,12 +58,14 @@ xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
 
 ## 兼容性边界
 
-兼容性是功能级、验证驱动的。当前仓库完整验证的基线是 `v1.0.6.675.mac`；Steam
-或其他渠道更新后的 Mac build 也可能有部分功能可用，但必须由该功能自己的 locator、
-目标校验、写入和读回校验逐项证明。
+当前仓库完整验证的 profile 是 `v1.0.6.675.mac`。修改器可以从运行进程识别 Steam
+自定义库、任意安装目录和独立 Unity app bundle，但安装路径兼容不代表固定补丁 RVA
+可以跨游戏更新复用。
 
-游戏版本号、build GUID、Mach-O UUID 和 metadata 信息只作为 profile 选择和诊断信号。
-某个功能定位不到或校验失败时，该功能会明确失败，不会把失败伪装成成功。
+玩家内存写入必须精确匹配 manifest 中的 bundle ID、版本、build GUID 和 GameAssembly
+arm64 UUID。未知构建仍可被识别并用于诊断，但会在读取或修改旧 RVA 前拒绝玩家写入。
+点击“导出兼容报告”可在本地生成 JSON，为新增精确版本 profile 提供证据。该操作必须
+由用户主动触发，应用不会自动上传报告。
 
 ## 功能范围
 
@@ -82,8 +84,9 @@ xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
 1. 先启动 macOS 版 `DAVE THE DIVER`。
 2. 启动 `DaveTheTrainer`。
 3. 确认修改器检测到游戏进程和 build fingerprint。
-4. 只点击你确实要使用的一键功能。
-5. 如果 macOS 请求管理员权限，请确认它只用于目标进程 attach/read/write 操作。
+4. 如果提示构建不支持，点击“导出兼容报告”，把 JSON 附到兼容性 issue；此时不会执行玩家写入。
+5. 在受支持构建上，只点击你确实要使用的一键功能。
+6. 如果 macOS 请求管理员权限，请确认它只用于目标进程 attach/read/write 操作。
 
 修改器会优先从正在运行的游戏进程反向定位实际 `.app`，因此支持 Steam 自定义库、
 非 `/Applications` 安装目录和直接运行的 Unity app bundle。进程只按名称找到时仍只是候选；
@@ -94,17 +97,17 @@ attach 前必须继续通过 `CFBundleExecutable`、`com.nexon.dave`、IL2CPP me
 界面显示 `Install Not Resolved` 表示进程已找到，但其 app bundle 未通过上述安装校验；
 这与 `Game Not Running` 不同，也不代表版本号本身不受支持。
 
-当游戏未运行、目标模块形态不匹配、功能目标校验失败、权限被拒绝或写后校验失败时，
-应用应该明确报错。
+当游戏未运行、构建或目标模块不匹配已审核 profile、功能目标校验失败、权限被拒绝或
+写后校验失败时，应用会明确报错。
 
 ## 权限和隐私
 
 DaveTheTrainer 会修改本机正在运行的游戏进程。macOS 可能要求管理员授权，
 用于 task access 和进程内存读写。
 
-应用不会上传 telemetry、内存 dump、存档、API key、崩溃日志或诊断信息。本地日志只用于排查问题。
-公开反馈问题时请删掉家目录路径、原始内存地址、存档路径、Steam 账号目录、无关进程信息、
-提取出的符号和 memory dump。
+应用不会上传 telemetry、内存 dump、存档、API key、崩溃日志或诊断信息。兼容报告只会
+在用户点击后写成本地 JSON，其中包含构建指纹和少量 manifest 目标字节，不含绝对路径和
+完整提取符号名。其他日志或手工收集的数据在公开前仍应脱敏。
 
 详细说明见 [Permissions And Privacy](docs/permissions-and-privacy.md)。
 
@@ -120,7 +123,7 @@ swift test
 `script/build_and_run.sh` 会构建 SwiftPM executable，生成真实的
 `DaveTheTrainer.app` bundle，签名，复制到
 `${DAVE_TRAINER_LOCAL_APP_DIR:-$HOME/Applications}`，同时在 `dist/` 下生成
-`DaveTheTrainer-v0.1.2-macOS.zip`。
+`DaveTheTrainer-v0.1.3-macOS.zip`。
 
 GitHub Actions 运行公开测试套件，并跳过需要本机游戏安装或专有游戏文件的测试：
 
@@ -155,8 +158,8 @@ Assets/                应用图标资源
 ## 开发原则
 
 - Manifest first：玩家按钮映射到已审查的 manifest feature ID。
-- 功能级兼容：未知 build 可以尝试，但每个功能都必须验证模块、目标字节或对象路径、
-  写入和读回结果。
+- 精确 profile 写入：玩家操作开始前必须匹配构建身份和 GameAssembly UUID。
+- 证据驱动兼容：未知 build 通过显式本地报告收集目标证据，不在玩家路径猜测新地址。
 - 不做静默 fallback：失败必须通过错误、日志或测试暴露。
 - 事务式补丁：多点补丁先 preflight，再提交，失败时 rollback。
 - 写后校验：运行时数值写入必须读回确认。

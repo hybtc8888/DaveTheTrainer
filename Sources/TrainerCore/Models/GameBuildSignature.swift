@@ -38,13 +38,17 @@ public struct GameBuildSignature: Equatable, Codable, Sendable {
     }
 
     public var isKnownBaseline: Bool {
-        bundleID == KnownGameBuild.current.bundleID
-            && version == KnownGameBuild.current.version
-            && buildGUID == KnownGameBuild.current.buildGUID
+        matchesIdentity(of: KnownGameBuild.current)
     }
 
     public var isDaveTheDiverBundle: Bool {
         bundleID == KnownGameBuild.current.bundleID
+    }
+
+    public func matchesIdentity(of profile: GameBuildSignature) -> Bool {
+        bundleID == profile.bundleID
+            && version == profile.version
+            && buildGUID == profile.buildGUID
     }
 }
 

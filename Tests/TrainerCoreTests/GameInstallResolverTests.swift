@@ -2,7 +2,7 @@ import XCTest
 @testable import TrainerCore
 
 final class InstalledGameIntegrationTests: XCTestCase {
-    func testInstalledDaveTheDiverSatisfiesAdaptiveHardRequirements() throws {
+    func testInstalledDaveTheDiverSatisfiesInstallRequirements() throws {
         let resolver = GameInstallResolver()
 
         let install = try resolver.resolveInstalledGame()

@@ -19,7 +19,8 @@ SwiftPM and SwiftUI app with a manifest-backed safety model.
 It is intentionally not a general memory scanner. Player-facing actions are
 bound to reviewed manifest feature IDs, a validated Mach-O module shape,
 reviewed patch points, and documented runtime object paths. The known game
-build is a validated baseline profile, not a global compatibility kill switch.
+build is a validated baseline profile. Installation discovery is relocatable,
+but memory writes require an exact reviewed profile.
 
 > This project is not affiliated with, endorsed by, or sponsored by MINTROCKET,
 > Nexon, or the creators of `DAVE THE DIVER`.
@@ -48,7 +49,7 @@ release notes before running the app.
 
 Install from a release zip:
 
-1. Download `DaveTheTrainer-v0.1.2-macOS.zip` from the latest release.
+1. Download `DaveTheTrainer-v0.1.3-macOS.zip` from the latest release.
 2. Unzip it.
 3. Move `DaveTheTrainer.app` to `/Applications` or `$HOME/Applications`.
 4. Start the supported macOS build of `DAVE THE DIVER`.
@@ -64,15 +65,17 @@ xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
 
 ## Compatibility Boundary
 
-Compatibility is feature-level and validation-gated. This repository's fully
-validated baseline is `v1.0.6.675.mac`; Steam or distributor updates may still
-work for individual features when their own locator, target validation, write,
-and readback checks pass.
+This repository's fully validated profile is `v1.0.6.675.mac`. The trainer may
+be installed anywhere, and it resolves Steam custom libraries and standalone
+Unity bundles from the running process. This path flexibility does not make
+fixed patch RVAs portable across game updates.
 
-Game version, build GUID, Mach-O UUID, and metadata details are profile signals.
-They help choose and diagnose feature locators, but they do not reject the
-entire app by themselves. A feature that cannot locate or verify its target
-fails explicitly and does not mark itself successful.
+Player memory writes require the manifest's exact bundle ID, version, build
+GUID, and GameAssembly arm64 UUID. An unknown build remains detectable and can
+be attached for diagnostics, but player writes are rejected before a stale RVA
+is read or modified. Use **Export Compatibility Report** to create a local JSON
+with targeted evidence for adding another exact build profile. The export is an
+explicit user action and is never uploaded automatically.
 
 ## What It Can Do
 
@@ -94,9 +97,11 @@ ignored.
 ## Design Principles
 
 - Manifest first: player buttons map to reviewed manifest feature IDs.
-- Feature-level compatibility: unknown builds may be attempted, but each
-  feature must validate the module, target bytes or object path, and readback
-  before reporting success.
+- Exact-profile writes: build identity and GameAssembly UUID must match a
+  reviewed profile before player memory operations begin.
+- Evidence-driven compatibility: unsupported builds export targeted local
+  diagnostics instead of guessing or scanning for replacement write targets at
+  runtime.
 - No silent fallback: failures surface as explicit errors, logs, or test
   failures.
 - Transactional patching: multi-point patch groups preflight targets and roll
@@ -126,7 +131,7 @@ swift test
 `script/build_and_run.sh` builds the SwiftPM executable, stages a real
 `DaveTheTrainer.app` bundle, signs it, copies the latest app to
 `${DAVE_TRAINER_LOCAL_APP_DIR:-$HOME/Applications}`, mirrors the artifact under
-`dist/`, creates `dist/DaveTheTrainer-v0.1.2-macOS.zip`, and launches the app.
+`dist/`, creates `dist/DaveTheTrainer-v0.1.3-macOS.zip`, and launches the app.
 
 To choose a different local app destination:
 
@@ -157,8 +162,11 @@ DAVE_TRAINER_SIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
 1. Start the macOS build of `DAVE THE DIVER`.
 2. Launch `DaveTheTrainer`.
 3. Confirm that the app detects the game process and build fingerprint.
-4. Apply only the one-click trainer operation you intend to use.
-5. If macOS asks for administrator authorization, review the prompt and allow
+4. If the build is unsupported, click **Export Compatibility Report** and
+   attach the JSON to the compatibility issue; no player writes will run.
+5. On a supported build, apply only the one-click trainer operation you intend
+   to use.
+6. If macOS asks for administrator authorization, review the prompt and allow
    it only for the trainer attach/read/write operation.
 
 The trainer derives the actual `.app` from the running game executable first,
@@ -173,9 +181,9 @@ running.
 not pass installation validation. It is distinct from `Game Not Running` and
 does not by itself mean that the version number is unsupported.
 
-The app should fail loudly when the game is missing, the target module does not
-match the required shape, a feature target cannot be validated, permission is
-denied, or readback verification fails.
+The app fails loudly when the game is missing, the build or target module does
+not match a reviewed profile, a feature target cannot be validated, permission
+is denied, or readback verification fails.
 
 ## Permissions And Privacy
 
@@ -183,10 +191,10 @@ DaveTheTrainer modifies a running local game process. macOS can require
 administrator authorization for task access and process memory writes.
 
 The app does not upload telemetry, memory dumps, save files, API keys, crash
-logs, or diagnostics. Local diagnostics are for troubleshooting only. Public
-bug reports should redact home directory paths, raw memory addresses, save
-paths, Steam account directories, unrelated process details, extracted symbols,
-and memory dumps.
+logs, or diagnostics. The compatibility exporter writes a local JSON containing
+build fingerprints and small, targeted manifest byte samples. It omits absolute
+paths and full extracted symbol names. Other logs or manually collected data
+should still be redacted before publication.
 
 See [Permissions And Privacy](docs/permissions-and-privacy.md) for the detailed
 policy.
@@ -227,8 +235,8 @@ swift test \
 Feature changes should follow the manifest-first workflow:
 
 1. Document the target feature in `DaveTrainerManifest`.
-2. Add tests for unknown-build feature validation, target mismatch, write
-   failure, verify failure, and success.
+2. Add tests for unknown-build rejection, target mismatch, write failure,
+   verify failure, and success.
 3. Implement the smallest validated patch point or runtime object path.
 4. Keep game-specific addresses and offsets in this project.
 5. Keep development discovery code behind explicit diagnostics.

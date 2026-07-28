@@ -126,6 +126,13 @@ final class TrainerOperationService {
             ))
         }
 
+        if let failure = buildCompatibilityFailure(
+            featureID: request.featureID,
+            gameBuild: context.gameBuild
+        ) {
+            return failure
+        }
+
         return try applyValidated(request, context: context, feature: feature)
     }
 
@@ -465,6 +472,30 @@ final class TrainerOperationService {
             state: .targetMismatch,
             targets: [],
             message: message
+        ))
+    }
+
+    func buildCompatibilityFailure(
+        featureID: DaveTrainerFeatureID,
+        gameBuild: GameBuildSignature
+    ) -> DaveTrainerOperationResult? {
+        guard let feature = manifest.feature(id: featureID),
+              feature.playerRuntimePolicy.requiresBuildMatch,
+              !gameBuild.matchesIdentity(of: manifest.gameBuild) else {
+            return nil
+        }
+        return unsupportedBuildResult(featureID: featureID, actual: gameBuild)
+    }
+
+    private func unsupportedBuildResult(
+        featureID: DaveTrainerFeatureID,
+        actual: GameBuildSignature
+    ) -> DaveTrainerOperationResult {
+        result(OperationResultDraft(
+            featureID: featureID,
+            state: .unsupportedBuild,
+            targets: [],
+            message: "当前游戏构建 \(actual.version) / \(actual.buildGUID) 尚无已验证补丁 profile；已阻止使用 \(manifest.gameBuild.version) 的地址写入。请点击“导出兼容报告”并将 JSON 附到 issue #2。"
         ))
     }
 

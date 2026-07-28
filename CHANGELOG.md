@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## v0.1.3 - 2026-07-28
+
+- Reject unknown game builds before any player memory write instead of applying stale baseline RVAs.
+- Require the exact manifest build identity and GameAssembly arm64 UUID for player operations while keeping installation paths relocatable.
+- Add an explicit, local-only compatibility report export for unsupported builds.
+- Include targeted manifest bytes, method-symbol candidate RVAs, build GUID, Mach-O UUID, metadata version, file sizes, and SHA-256 fingerprints in reports.
+- Exclude absolute paths and full extracted symbol names from exported reports.
+- Replace ASLR-dependent AOB errors with patch notes, RVAs, and expected/observed bytes.
+
 ## v0.1.2 - 2026-07-28
 
 - Resolve the game bundle from the running executable instead of requiring `/Applications/DaveTheDiver.app`.

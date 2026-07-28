@@ -2,6 +2,7 @@ import AppKit
 import Darwin
 import Foundation
 import TrainerCore
+import UniformTypeIdentifiers
 
 private let freezeIntervalSeconds = 0.25
 private let defaultSetValueText = "999999"
@@ -11,6 +12,11 @@ private let osascriptPath = "/usr/bin/osascript"
 
 private enum StaticLocateOutcome: Sendable {
     case success(Il2CppStaticLocationReport)
+    case failure(String)
+}
+
+private enum CompatibilityReportExportOutcome: Sendable {
+    case success(fileName: String, patchPointCount: Int)
     case failure(String)
 }
 
@@ -42,21 +48,34 @@ private actor QuantityOperationWorker {
 @MainActor
 final class AppStore: ObservableObject {
     struct Dependencies {
+        struct Runtime {
+            let memoryAccess: MemoryAccess
+            let trainerOperationService: TrainerOperationService
+            let compatibilityReportGenerator: any DaveCompatibilityReportGenerating
+
+            init(
+                memoryAccess: MemoryAccess = MachMemoryAccess(),
+                trainerOperationService: TrainerOperationService = TrainerOperationService(),
+                compatibilityReportGenerator: any DaveCompatibilityReportGenerating = DaveCompatibilityReportGenerator()
+            ) {
+                self.memoryAccess = memoryAccess
+                self.trainerOperationService = trainerOperationService
+                self.compatibilityReportGenerator = compatibilityReportGenerator
+            }
+        }
+
         let installResolver: GameInstallResolving
         let processResolver: ProcessResolving
-        let memoryAccess: MemoryAccess
-        let trainerOperationService: TrainerOperationService
+        let runtime: Runtime
 
         init(
             installResolver: GameInstallResolving = GameInstallResolver(),
             processResolver: ProcessResolving = LibProcProcessResolver(),
-            memoryAccess: MemoryAccess = MachMemoryAccess(),
-            trainerOperationService: TrainerOperationService = TrainerOperationService()
+            runtime: Runtime = Runtime()
         ) {
             self.installResolver = installResolver
             self.processResolver = processResolver
-            self.memoryAccess = memoryAccess
-            self.trainerOperationService = trainerOperationService
+            self.runtime = runtime
         }
     }
 
@@ -94,6 +113,7 @@ final class AppStore: ObservableObject {
     private let quantityWorker: QuantityOperationWorker
     private let staticFeatureLocator: Il2CppStaticFeatureLocator
     private let trainerOperationService: TrainerOperationService
+    private let compatibilityReportGenerator: any DaveCompatibilityReportGenerating
     private var session: MemorySession?
     private var freezeTimers: [String: Timer] = [:]
     private var hasRequestedAdministratorRelaunch = false
@@ -101,7 +121,7 @@ final class AppStore: ObservableObject {
     init(dependencies: Dependencies = Dependencies()) {
         self.installResolver = dependencies.installResolver
         self.processResolver = dependencies.processResolver
-        self.memoryAccess = dependencies.memoryAccess
+        self.memoryAccess = dependencies.runtime.memoryAccess
         do {
             self.addressStore = try AddressBookStore()
             self.addressStoreInitializationError = nil
@@ -112,9 +132,10 @@ final class AppStore: ObservableObject {
         self.backupService = SaveBackupService()
         self.scanner = ProcessMemoryScanner()
         self.writer = FeatureWriter()
-        self.quantityWorker = QuantityOperationWorker(trainerOperationService: dependencies.trainerOperationService)
+        self.quantityWorker = QuantityOperationWorker(trainerOperationService: dependencies.runtime.trainerOperationService)
         self.staticFeatureLocator = Il2CppStaticFeatureLocator()
-        self.trainerOperationService = dependencies.trainerOperationService
+        self.trainerOperationService = dependencies.runtime.trainerOperationService
+        self.compatibilityReportGenerator = dependencies.runtime.compatibilityReportGenerator
         refreshAll()
     }
 
@@ -138,7 +159,7 @@ final class AppStore: ObservableObject {
                 log("已识别已验证基线：\(resolvedInstall.signature.version) / \(resolvedInstall.signature.buildGUID)")
                 return
             }
-            log("已识别 Dave 安装：\(resolvedInstall.signature.version) / \(resolvedInstall.signature.buildGUID)。当前版本未作为完整基线验证，将按功能逐项定位和校验。")
+            log("已识别 Dave 安装：\(resolvedInstall.signature.version) / \(resolvedInstall.signature.buildGUID)。当前构建没有已验证补丁 profile，玩家写入已禁用；请导出兼容报告。", isError: true)
         } catch {
             install = nil
             features = DefaultTrainerFeatures.make(requiredBuild: KnownGameBuild.current)
@@ -194,6 +215,17 @@ final class AppStore: ObservableObject {
         refreshGameContext()
         refreshAddressBook()
         refreshSaves()
+        guard let build = install?.signature else {
+            log("尚未识别游戏安装，无法完成一键准备。", isError: true)
+            return
+        }
+        if let failure = trainerOperationService.buildCompatibilityFailure(
+            featureID: .divingGod,
+            gameBuild: build
+        ) {
+            publishOperationResult(failure)
+            return
+        }
         createBackup()
         attach()
     }
@@ -219,6 +251,51 @@ final class AppStore: ObservableObject {
                 log(Self.staticFeatureSummary(report))
             case .failure(let message):
                 staticLocationReport = nil
+                log(message, isError: true)
+            }
+        }
+    }
+
+    func exportCompatibilityReport() {
+        guard !isBusy else {
+            log("正在处理上一项操作，请等待完成。", isError: true)
+            return
+        }
+        guard let build = install?.signature else {
+            log("尚未识别游戏安装，无法生成兼容报告。请先启动游戏并刷新。", isError: true)
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = Self.compatibilityReportFileName(for: build.version)
+        panel.title = "导出 DaveTheTrainer 兼容报告"
+        guard panel.runModal() == .OK, let destination = panel.url else {
+            return
+        }
+
+        let request = DaveCompatibilityReportRequest(
+            build: build,
+            trainer: trainerReleaseIdentity(),
+            profile: .current
+        )
+        let generator = compatibilityReportGenerator
+        isBusy = true
+        log("正在读取游戏构建指纹和 manifest 补丁证据；不会写入游戏或上传数据。")
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) {
+                Self.writeCompatibilityReport(
+                    request: request,
+                    destination: destination,
+                    generator: generator
+                )
+            }.value
+            isBusy = false
+            switch outcome {
+            case .success(let fileName, let patchPointCount):
+                log("兼容报告已导出：\(fileName)，包含 \(patchPointCount) 个 manifest 补丁点。请将该 JSON 附到 issue #2。")
+            case .failure(let message):
                 log(message, isError: true)
             }
         }
@@ -485,6 +562,13 @@ final class AppStore: ObservableObject {
         }
 
         let gameBuild = try currentOperationBuild()
+        if let failure = trainerOperationService.buildCompatibilityFailure(
+            featureID: featureID,
+            gameBuild: gameBuild
+        ) {
+            publishOperationResult(failure)
+            return false
+        }
         let context = TrainerOperationContext(session: try requireSession(), gameBuild: gameBuild)
         let result = try trainerOperationService.apply(TrainerOperationRequest(
             featureID: featureID,
@@ -593,6 +677,14 @@ final class AppStore: ObservableObject {
                 throw TrainerError.invalidInput("未知 manifest feature：\(request.option.manifestFeatureID)")
             }
             let gameBuild = try currentOperationBuild()
+            if let failure = trainerOperationService.buildCompatibilityFailure(
+                featureID: featureID,
+                gameBuild: gameBuild
+            ) {
+                publishOperationResult(failure)
+                completion(false)
+                return
+            }
             let activeSession = try requireSession()
             isBusy = true
             log("正在后台调整 \(request.option.title)：\(request.valueText)。")
@@ -789,6 +881,38 @@ final class AppStore: ObservableObject {
         }
         let tokenText = tokens.isEmpty ? "未得到 method/field token" : tokens.joined(separator: ", ")
         return "\(feature.title) 静态特征 \(feature.status.rawValue)：\(tokenText)。当前未执行慢速数值扫描；还需要把 token 映射到运行时对象/函数写入点后才能直接修改。"
+    }
+
+    nonisolated private static func writeCompatibilityReport(
+        request: DaveCompatibilityReportRequest,
+        destination: URL,
+        generator: any DaveCompatibilityReportGenerating
+    ) -> CompatibilityReportExportOutcome {
+        do {
+            let report = try generator.generate(request)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            let data = try encoder.encode(report)
+            try data.write(to: destination, options: .atomic)
+            return .success(fileName: destination.lastPathComponent, patchPointCount: report.patches.count)
+        } catch {
+            return .failure("兼容报告导出失败：\(error.localizedDescription)")
+        }
+    }
+
+    private func trainerReleaseIdentity() -> DaveTrainerReleaseIdentity {
+        let info = Bundle.main.infoDictionary ?? [:]
+        return DaveTrainerReleaseIdentity(
+            version: info["CFBundleShortVersionString"] as? String ?? "development",
+            build: info["CFBundleVersion"] as? String ?? "local",
+            commit: info["DaveTrainerGitCommit"] as? String ?? "unknown"
+        )
+    }
+
+    nonisolated private static func compatibilityReportFileName(for version: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
+        let safeVersion = version.unicodeScalars.map { allowed.contains($0) ? Character(String($0)) : "-" }
+        return "DaveTheTrainer-compatibility-\(String(safeVersion)).json"
     }
 
     private func log(_ message: String, isError: Bool = false) {

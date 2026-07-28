@@ -3,7 +3,7 @@ import TrainerCore
 @testable import DaveTheTrainer
 
 final class TrainerOperationServiceTests: XCTestCase {
-    func testUnknownBuildStaticPatchUsesFeatureValidation() throws {
+    func testUnknownBuildStaticPatchReturnsUnsupportedWithoutWritingMemory() throws {
         let applier = RecordingTrainerOperationApplier()
         let service = TrainerOperationService(configuration: .test(applier: applier))
         let result = try service.apply(
@@ -11,8 +11,10 @@ final class TrainerOperationServiceTests: XCTestCase {
             context: TrainerOperationContext(session: Self.session(), gameBuild: Self.unsupportedBuild)
         )
 
-        XCTAssertEqual(result.state, .bytesApplied)
-        XCTAssertEqual(applier.requests.map(\.patch.id), ["god.0"])
+        XCTAssertEqual(result.state, .unsupportedBuild)
+        XCTAssertTrue(result.message.contains("导出兼容报告"))
+        XCTAssertTrue(applier.preflightRequests.isEmpty)
+        XCTAssertTrue(applier.requests.isEmpty)
     }
 
     func testUnknownManifestFeatureReturnsTargetMismatchWithoutWritingMemory() throws {
@@ -174,7 +176,7 @@ final class TrainerOperationServiceTests: XCTestCase {
         XCTAssertEqual(runtimeIncrementer.requests, [RuntimeQuantityIncrementRequest(featureID: "gold", delta: 99)])
     }
 
-    func testUnknownBuildRuntimeResourceUsesFeatureValidation() throws {
+    func testUnknownBuildRuntimeResourceReturnsUnsupportedWithoutWritingMemory() throws {
         let runtimeIncrementer = RecordingRuntimeQuantityIncrementer(result: RuntimeQuantityIncrementResult(updatedAddressCount: 1))
         let service = TrainerOperationService(configuration: .test(
             applier: RecordingTrainerOperationApplier(),
@@ -185,8 +187,8 @@ final class TrainerOperationServiceTests: XCTestCase {
             context: TrainerOperationContext(session: Self.session(), gameBuild: Self.unsupportedBuild)
         )
 
-        XCTAssertEqual(result.state, .behaviorVerified)
-        XCTAssertEqual(runtimeIncrementer.requests, [RuntimeQuantityIncrementRequest(featureID: "gold", delta: 99)])
+        XCTAssertEqual(result.state, .unsupportedBuild)
+        XCTAssertTrue(runtimeIncrementer.requests.isEmpty)
     }
 
     func testResourceWithoutManifestCapabilityReturnsTargetMismatch() throws {

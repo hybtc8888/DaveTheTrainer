@@ -93,7 +93,7 @@ public final class Il2CppMetadataAnalyzer {
     public init() {}
 
     public func analyze(metadataURL: URL, targetNames: [String]) throws -> Il2CppMetadataAnalysis {
-        let data = try Data(contentsOf: metadataURL)
+        let data = try Data(contentsOf: metadataURL, options: .mappedIfSafe)
         let header = try parseHeader(data)
         let uniqueNames = Array(Set(targetNames)).sorted()
         let stringIndices = try findStringTableIndices(names: uniqueNames, header: header, data: data)
@@ -175,6 +175,9 @@ public final class Il2CppMetadataAnalyzer {
         data: Data,
         makeMatch: (Int, UInt32) -> T
     ) throws -> [UInt32: T] {
+        guard !wanted.isEmpty else {
+            return [:]
+        }
         guard range.size % recordSize == 0 else {
             throw TrainerError.fileOperationFailed("metadata 表大小 \(range.size) 不能整除记录宽度 \(recordSize)。")
         }

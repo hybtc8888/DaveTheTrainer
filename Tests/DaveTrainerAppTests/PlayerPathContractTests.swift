@@ -11,12 +11,20 @@ final class PlayerPathContractTests: XCTestCase {
         XCTAssertFalse(viewSource.contains("refreshStaticFeatures()"))
     }
 
+    func testDefaultPlayerViewExposesExplicitCompatibilityReportExport() throws {
+        let viewSource = try Self.readProjectFile("Sources/DaveTrainerApp/Views/SimpleTrainerView.swift")
+
+        XCTAssertTrue(viewSource.contains("Label(\"导出兼容报告\""))
+        XCTAssertTrue(viewSource.contains("store.exportCompatibilityReport()"))
+    }
+
     func testQuickPrepareDoesNotRunDeveloperStaticFeatureLocator() throws {
         let storeSource = try Self.readProjectFile("Sources/DaveTrainerApp/Stores/AppStore.swift")
         let quickPrepareBody = try Self.functionBody(named: "quickPrepare", in: storeSource)
 
         XCTAssertFalse(quickPrepareBody.contains("refreshStaticFeatures()"))
         XCTAssertFalse(quickPrepareBody.contains("locateStaticFeatures"))
+        XCTAssertFalse(quickPrepareBody.contains("exportCompatibilityReport"))
     }
 
     func testDefaultPlayerOptionsAreManifestBacked() {
@@ -61,7 +69,7 @@ final class PlayerPathContractTests: XCTestCase {
         let store = AppStore(dependencies: AppStore.Dependencies(
             installResolver: installResolver,
             processResolver: FixedProcessResolver(process: process),
-            memoryAccess: CurrentProcessMemoryAccess()
+            runtime: AppStore.Dependencies.Runtime(memoryAccess: CurrentProcessMemoryAccess())
         ))
 
         XCTAssertEqual(store.install?.signature, install.signature)
@@ -70,7 +78,7 @@ final class PlayerPathContractTests: XCTestCase {
         XCTAssertEqual(installResolver.fixedPathResolveCount, 0)
     }
 
-    func testUnknownBuildPatchAttemptsFeatureValidationWithoutMarkingPatchEnabled() async throws {
+    func testUnknownBuildPatchIsRejectedWithoutMarkingPatchEnabled() async throws {
         let memoryAccess = RecordingMemoryAccess()
         let store = AppStore(dependencies: .test(install: Self.unsupportedInstall, memoryAccess: memoryAccess))
         let option = try XCTUnwrap(SimpleTrainerOptions.diving.first { $0.id == "god" })
@@ -87,12 +95,12 @@ final class PlayerPathContractTests: XCTestCase {
 
         XCTAssertEqual(completionResult, false)
         XCTAssertFalse(store.isPatchEnabled(id: "god"))
-        XCTAssertEqual(store.latestOperationResult?.state, .writeFailed)
+        XCTAssertEqual(store.latestOperationResult?.state, .unsupportedBuild)
         XCTAssertTrue(store.latestMessageIsError)
-        XCTAssertEqual(memoryAccess.attachCount, 1)
+        XCTAssertEqual(memoryAccess.attachCount, 0)
     }
 
-    func testUnknownBuildRuntimeResourceAttemptsFeatureValidation() async throws {
+    func testUnknownBuildRuntimeResourceIsRejected() async throws {
         let memoryAccess = RecordingMemoryAccess()
         let store = AppStore(dependencies: .test(install: Self.unsupportedInstall, memoryAccess: memoryAccess))
         let option = try XCTUnwrap(SimpleTrainerOptions.currencies.first { $0.id == "money" })
@@ -108,9 +116,9 @@ final class PlayerPathContractTests: XCTestCase {
         }
 
         XCTAssertEqual(completionResult, false)
-        XCTAssertEqual(store.latestOperationResult?.state, .writeFailed)
+        XCTAssertEqual(store.latestOperationResult?.state, .unsupportedBuild)
         XCTAssertTrue(store.latestMessageIsError)
-        XCTAssertEqual(memoryAccess.attachCount, 1)
+        XCTAssertEqual(memoryAccess.attachCount, 0)
     }
 
     private static var unsupportedInstall: GameInstall {
@@ -168,7 +176,7 @@ private extension AppStore.Dependencies {
         AppStore.Dependencies(
             installResolver: FixedGameInstallResolver(install: install),
             processResolver: FixedProcessResolver(),
-            memoryAccess: memoryAccess
+            runtime: AppStore.Dependencies.Runtime(memoryAccess: memoryAccess)
         )
     }
 }

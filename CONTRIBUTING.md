@@ -4,7 +4,8 @@ Contributions must preserve the trainer product model:
 
 - Player features are manifest-first.
 - Player buttons do not run global memory scans.
-- Unknown builds may be attempted only through feature-level validation.
+- Unknown builds must be rejected before player writes. Use the explicit local
+  compatibility report to collect evidence for a new exact profile.
 - Multi-point patches are transactional.
 - Writes require readback or behavior verification.
 - Development discovery code must stay behind explicit diagnostics.

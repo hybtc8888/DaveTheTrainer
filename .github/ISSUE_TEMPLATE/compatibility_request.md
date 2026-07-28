@@ -1,8 +1,11 @@
 # Compatibility Request
 
-Compatibility is feature-resolved, not version-whitelisted. Requests are
-welcome when a feature fails its locator, target validation, write, or readback
-check on a detected build.
+Player writes use exact reviewed build profiles. Requests are welcome for a
+detected build that does not yet have a profile.
+
+In DaveTheTrainer v0.1.3 or newer, click **Export Compatibility Report** and
+attach the generated JSON. The app creates it locally, does not upload it, and
+omits absolute paths and full extracted symbol names.
 
 ## Game Build
 
@@ -12,6 +15,7 @@ check on a detected build.
 - Is `GameAssembly.dylib` present:
 - Detected GameAssembly UUID, if shown:
 - Detected metadata version, if shown:
+- Compatibility report attached:
 
 ## Feature Failure
 
@@ -28,5 +32,6 @@ check on a detected build.
 
 ## Notes
 
-Do not attach game binaries, extracted assets, save files, memory dumps, or
-private account paths.
+Do not attach game binaries, extracted assets, save files, memory dumps, manual
+symbol dumps, or private account paths. The app-generated compatibility JSON is
+the supported diagnostic attachment.

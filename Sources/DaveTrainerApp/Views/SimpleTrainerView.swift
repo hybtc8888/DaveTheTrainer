@@ -81,6 +81,15 @@ private struct SimpleSidePanel: View {
                     store.createBackup()
                 }
             }
+
+            Button {
+                store.exportCompatibilityReport()
+            } label: {
+                Label("导出兼容报告", systemImage: "doc.badge.gearshape")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(store.install == nil || store.isBusy)
         }
         .controlSize(.large)
     }

@@ -92,6 +92,7 @@ public final class StaticPatchEngine {
             address: address,
             rva: point.rva,
             moduleBase: module.baseAddress,
+            note: point.note,
             current: current,
             expected: Data(point.expectedBytes),
             patch: Data(point.patchBytes),
@@ -113,6 +114,7 @@ public final class StaticPatchEngine {
             address: address,
             rva: point.rva,
             moduleBase: module.baseAddress,
+            note: point.note,
             current: snapshot,
             expected: Data(point.expectedBytes),
             patch: Data(point.patchBytes),
@@ -187,7 +189,7 @@ public final class StaticPatchEngine {
         }
 
         guard mutation.current == mutation.expected else {
-            throw TrainerError.targetMismatch("AOB 校验失败：0x\(String(mutation.address, radix: 16)) 当前字节不匹配。")
+            throw TrainerError.targetMismatch(Self.byteMismatchMessage(mutation, operation: "校验"))
         }
 
         if trampoline.codeCaveRVA != nil {
@@ -219,7 +221,9 @@ public final class StaticPatchEngine {
         let expected = Data(expectedBytes)
         let current = try mutation.session.read(MemoryReadRequest(address: codeCaveAddress, size: expected.count))
         guard current == expected else {
-            throw TrainerError.targetMismatch("RPG damage trampoline code cave 校验失败：0x\(String(codeCaveAddress, radix: 16)) 当前字节不匹配。")
+            throw TrainerError.targetMismatch(
+                "\(mutation.note) code cave 校验失败（RVA 0x\(String(codeCaveRVA, radix: 16))）：期望 [\(expected.hexBytes)]，实际 [\(current.hexBytes)]。"
+            )
         }
     }
 
@@ -241,7 +245,7 @@ public final class StaticPatchEngine {
         }
 
         guard mutation.current == mutation.expected else {
-            throw TrainerError.targetMismatch("AOB 校验失败：0x\(String(mutation.address, radix: 16)) 当前字节不匹配。")
+            throw TrainerError.targetMismatch(Self.byteMismatchMessage(mutation, operation: "校验"))
         }
 
         let allocation = try allocateTrampolinePage(mutation, trampoline: trampoline)
@@ -285,14 +289,16 @@ public final class StaticPatchEngine {
         }
 
         guard mutation.current == mutation.expected else {
-            throw TrainerError.targetMismatch("AOB 校验失败：0x\(String(mutation.address, radix: 16)) 当前字节不匹配。")
+            throw TrainerError.targetMismatch(Self.byteMismatchMessage(mutation, operation: "校验"))
         }
 
         let codeCaveAddress = mutation.moduleBase + codeCaveRVA
         let expected = Data(expectedBytes)
         let current = try mutation.session.read(MemoryReadRequest(address: codeCaveAddress, size: expected.count))
         guard current == expected else {
-            throw TrainerError.targetMismatch("RPG damage trampoline code cave 校验失败：0x\(String(codeCaveAddress, radix: 16)) 当前字节不匹配。")
+            throw TrainerError.targetMismatch(
+                "\(mutation.note) code cave 校验失败（RVA 0x\(String(codeCaveRVA, radix: 16))）：期望 [\(expected.hexBytes)]，实际 [\(current.hexBytes)]。"
+            )
         }
 
         do {
@@ -562,14 +568,18 @@ public final class StaticPatchEngine {
 
     private func validateCanApply(_ mutation: PatchMutation) throws {
         guard canApply(mutation) else {
-            throw TrainerError.targetMismatch("AOB 校验失败：0x\(String(mutation.address, radix: 16)) 当前字节不匹配。")
+            throw TrainerError.targetMismatch(Self.byteMismatchMessage(mutation, operation: "校验"))
         }
     }
 
     private func validateCanRestore(_ mutation: PatchMutation) throws {
         guard mutation.current == mutation.expected || canRestore(mutation) else {
-            throw TrainerError.targetMismatch("AOB 恢复校验失败：0x\(String(mutation.address, radix: 16)) 当前字节不匹配。")
+            throw TrainerError.targetMismatch(Self.byteMismatchMessage(mutation, operation: "恢复校验"))
         }
+    }
+
+    private static func byteMismatchMessage(_ mutation: PatchMutation, operation: String) -> String {
+        "\(mutation.note) \(operation)失败（RVA 0x\(String(mutation.rva, radix: 16))）：期望 [\(mutation.expected.hexBytes)]，实际 [\(mutation.current.hexBytes)]。"
     }
 
     private func canApply(_ mutation: PatchMutation) -> Bool {
@@ -831,6 +841,7 @@ private struct PatchMutation {
     let address: UInt64
     let rva: UInt64
     let moduleBase: UInt64
+    let note: String
     let current: Data
     let expected: Data
     let patch: Data
@@ -844,6 +855,7 @@ private struct PatchMutation {
             address: address,
             rva: rva,
             moduleBase: moduleBase,
+            note: note,
             current: current,
             expected: expected,
             patch: patch,
@@ -867,6 +879,10 @@ private struct AddressBounds {
 }
 
 private extension Data {
+    var hexBytes: String {
+        map { String(format: "%02X", $0) }.joined(separator: " ")
+    }
+
     func littleEndianUInt32(at offset: Int) -> UInt32 {
         let end = offset + arm64InstructionByteCount
         let bytes = self[offset..<end]
