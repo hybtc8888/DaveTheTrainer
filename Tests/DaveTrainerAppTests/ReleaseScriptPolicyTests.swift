@@ -59,7 +59,7 @@ final class ReleaseScriptPolicyTests: XCTestCase {
         XCTAssertTrue(script.contains("LOCAL_APP_DIR=\"${DAVE_TRAINER_LOCAL_APP_DIR:-$DEFAULT_LOCAL_APP_DIR}\""))
         XCTAssertTrue(script.contains("DIST_DIR=\"$ROOT_DIR/dist\""))
         XCTAssertTrue(script.contains("APP_ZIP=\"$DIST_DIR/$APP_ZIP_FILE_NAME\""))
-        XCTAssertTrue(script.contains("STAGE_DIR=\"$ROOT_DIR/.build/release-bundle-stage\""))
+        XCTAssertTrue(script.contains("mktemp -d \"${TMPDIR:-/tmp}/davetrainer-release-stage.XXXXXX\""))
         XCTAssertFalse(script.contains("/private/tmp/$APP_NAME"))
     }
 

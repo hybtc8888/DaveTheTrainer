@@ -20,7 +20,7 @@ APP_SHA256="$APP_ZIP.sha256"
 DEFAULT_LOCAL_APP_DIR="${HOME:?HOME is required}/Applications"
 LOCAL_APP_DIR="${DAVE_TRAINER_LOCAL_APP_DIR:-$DEFAULT_LOCAL_APP_DIR}"
 LOCAL_APP_BUNDLE="$LOCAL_APP_DIR/$APP_NAME.app"
-STAGE_DIR="$ROOT_DIR/.build/release-bundle-stage"
+STAGE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/davetrainer-release-stage.XXXXXX")"
 ZIP_VERIFY_DIR=""
 STAGE_BUNDLE="$STAGE_DIR/$APP_NAME.app"
 APP_CONTENTS="$STAGE_BUNDLE/Contents"
@@ -34,6 +34,7 @@ METADATA_SETTLE_SECONDS="1"
 IS_RELEASE_PACKAGE=0
 
 cleanup() {
+  rm -rf "$STAGE_DIR"
   if [[ "$ZIP_VERIFY_DIR" != "" ]]; then
     rm -rf "$ZIP_VERIFY_DIR"
   fi
