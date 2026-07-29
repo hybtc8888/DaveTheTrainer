@@ -226,13 +226,13 @@ private struct SimpleOptionRow: View {
                 Toggle("", isOn: binding)
                     .toggleStyle(.switch)
                     .labelsHidden()
-                    .disabled(!option.isAvailable || store.isBusy || isPending)
+                    .disabled(!isAvailable || store.isBusy || isPending)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(option.title)
                     .font(.title3.bold())
-                    .foregroundStyle(option.isAvailable ? .white.opacity(0.90) : .white.opacity(0.52))
-                if let reason = option.unavailableReason {
+                    .foregroundStyle(isAvailable ? .white.opacity(0.90) : .white.opacity(0.52))
+                if let reason = unavailableReason {
                     Text(reason)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.orange.opacity(0.72))
@@ -243,7 +243,7 @@ private struct SimpleOptionRow: View {
                 ProgressView()
                     .controlSize(.small)
             }
-            if !option.isAvailable {
+            if !isAvailable {
                 Image(systemName: "exclamationmark.circle.fill")
                     .foregroundStyle(.gray)
             }
@@ -257,11 +257,11 @@ private struct SimpleOptionRow: View {
                     .frame(width: 110)
                     .padding(.vertical, 3)
                     .background(Color.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 6))
-                    .disabled(!option.isAvailable || store.isBusy || isPending)
+                    .disabled(!isAvailable || store.isBusy || isPending)
                 Button("应用") {
                     apply(enabled: true)
                 }
-                .disabled(!option.isAvailable || store.isBusy || isPending)
+                .disabled(!isAvailable || store.isBusy || isPending)
             }
         }
         .padding(.horizontal, 14)
@@ -286,6 +286,14 @@ private struct SimpleOptionRow: View {
                 apply(enabled: nextValue)
             }
         )
+    }
+
+    private var unavailableReason: String? {
+        option.unavailableReason ?? store.unsupportedReason(for: option)
+    }
+
+    private var isAvailable: Bool {
+        unavailableReason == nil
     }
 
     private func apply(enabled: Bool) {

@@ -155,8 +155,8 @@ final class AppStore: ObservableObject {
             }
             install = resolvedInstall
             features = DefaultTrainerFeatures.make(requiredBuild: resolvedInstall.signature)
-            if resolvedInstall.signature.isKnownBaseline {
-                log("已识别已验证基线：\(resolvedInstall.signature.version) / \(resolvedInstall.signature.buildGUID)")
+            if let summary = trainerOperationService.profileSummary(for: resolvedInstall.signature) {
+                log(summary)
                 return
             }
             log("已识别 Dave 安装：\(resolvedInstall.signature.version) / \(resolvedInstall.signature.buildGUID)。当前构建没有已验证补丁 profile，玩家写入已禁用；请导出兼容报告。", isError: true)
@@ -219,7 +219,7 @@ final class AppStore: ObservableObject {
             log("尚未识别游戏安装，无法完成一键准备。", isError: true)
             return
         }
-        if let failure = trainerOperationService.buildCompatibilityFailure(
+        if let failure = trainerOperationService.buildSupportFailure(
             featureID: .divingGod,
             gameBuild: build
         ) {
@@ -228,6 +228,16 @@ final class AppStore: ObservableObject {
         }
         createBackup()
         attach()
+    }
+
+    func unsupportedReason(for option: SimpleTrainerOption) -> String? {
+        guard option.isAvailable, let build = install?.signature else {
+            return option.unavailableReason
+        }
+        guard let featureID = DaveTrainerFeatureID(rawValue: option.manifestFeatureID) else {
+            return "功能没有有效的 manifest ID。"
+        }
+        return trainerOperationService.unsupportedReason(featureID: featureID, gameBuild: build)
     }
 
     func refreshStaticFeatures() {
@@ -617,6 +627,7 @@ final class AppStore: ObservableObject {
     private func clearAttachment() {
         isAttached = false
         session = nil
+        enabledPatchIDs.removeAll()
         clearRuntimeQuantityCaches()
     }
 

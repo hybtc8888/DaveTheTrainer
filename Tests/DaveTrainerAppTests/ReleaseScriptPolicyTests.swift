@@ -12,8 +12,8 @@ final class ReleaseScriptPolicyTests: XCTestCase {
         XCTAssertTrue(script.contains("DaveTrainerManifestSchemaVersion"))
         XCTAssertTrue(script.contains("DaveTrainerGitCommit"))
         XCTAssertTrue(script.contains("DaveTrainerBuildDate"))
-        XCTAssertTrue(script.contains("APP_VERSION=\"${DAVE_TRAINER_VERSION:-0.1.3}\""))
-        XCTAssertTrue(script.contains("APP_BUILD_VERSION=\"${DAVE_TRAINER_BUILD_VERSION:-4}\""))
+        XCTAssertTrue(script.contains("APP_VERSION=\"${DAVE_TRAINER_VERSION:-0.1.4}\""))
+        XCTAssertTrue(script.contains("APP_BUILD_VERSION=\"${DAVE_TRAINER_BUILD_VERSION:-5}\""))
     }
 
     func testReleasePackageUsesReleaseBuildAndRequiresExplicitSigningIdentity() throws {

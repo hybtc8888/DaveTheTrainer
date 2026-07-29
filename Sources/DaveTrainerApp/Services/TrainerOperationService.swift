@@ -64,10 +64,30 @@ final class TrainerOperationService {
         let runtimeQuantityIncrementer: RuntimeQuantityIncrementing
         let ingredientsIncrementer: IngredientsInventoryIncrementing
         let jungleIngredientsIncrementer: JungleIngredientsInventoryIncrementing
+        let intentionallyUnsupportedFeatureIDs: Set<DaveTrainerFeatureID>
 
-        static func live() -> Configuration {
-            let manifest = DaveTrainerManifest.current
-            let patches = DefaultStaticGamePatches.make()
+        static func liveProfiles() -> [Configuration] {
+            [
+                live(
+                    manifest: .current,
+                    patches: DefaultStaticGamePatches.make(),
+                    unsupportedFeatureIDs: []
+                ),
+                live(
+                    manifest: .v106710,
+                    patches: DaveV106710StaticGamePatches.make(),
+                    unsupportedFeatureIDs: Set(DaveTrainerFeatureID.allCases).subtracting(
+                        DaveTrainerManifest.v106710.features.map(\.id)
+                    )
+                )
+            ]
+        }
+
+        private static func live(
+            manifest: DaveTrainerManifest,
+            patches: [StaticGamePatch],
+            unsupportedFeatureIDs: Set<DaveTrainerFeatureID>
+        ) -> Configuration {
             let moduleResolver = MachOModuleResolver(
                 expectedModuleIdentity: manifest.moduleIdentity(id: DaveTrainerManifest.gameAssemblyModuleID)
             )
@@ -77,12 +97,133 @@ final class TrainerOperationService {
                 applier: StaticPatchEngine(moduleResolver: moduleResolver),
                 runtimeQuantityIncrementer: RuntimeQuantityIncrementer(moduleResolver: moduleResolver),
                 ingredientsIncrementer: IngredientsInventoryIncrementer(moduleResolver: moduleResolver),
-                jungleIngredientsIncrementer: JungleIngredientsInventoryIncrementer(moduleResolver: moduleResolver)
+                jungleIngredientsIncrementer: JungleIngredientsInventoryIncrementer(moduleResolver: moduleResolver),
+                intentionallyUnsupportedFeatureIDs: unsupportedFeatureIDs
             )
         }
     }
 
-    private let manifest: DaveTrainerManifest
+    private let profileServices: [TrainerBuildOperationService]
+
+    convenience init() {
+        self.init(configurations: Configuration.liveProfiles())
+    }
+
+    init(configuration: Configuration) {
+        self.profileServices = [TrainerBuildOperationService(configuration: configuration)]
+    }
+
+    init(configurations: [Configuration]) {
+        precondition(!configurations.isEmpty, "TrainerOperationService requires at least one build profile")
+        self.profileServices = configurations.map(TrainerBuildOperationService.init)
+        precondition(Self.hasUniqueBuildIdentities(profileServices), "Duplicate trainer build profile identity")
+    }
+
+    func clearRuntimeCaches() {
+        profileServices.forEach { $0.clearRuntimeCaches() }
+    }
+
+    func apply(
+        _ request: TrainerOperationRequest,
+        context: TrainerOperationContext
+    ) throws -> DaveTrainerOperationResult {
+        guard let service = matchingService(for: context.gameBuild) else {
+            return unsupportedBuildResult(featureID: request.featureID, actual: context.gameBuild)
+        }
+        if service.intentionallyUnsupportedFeatureIDs.contains(request.featureID) {
+            return unsupportedFeatureResult(featureID: request.featureID, service: service)
+        }
+        return try service.apply(request, context: context)
+    }
+
+    func buildCompatibilityFailure(
+        featureID: DaveTrainerFeatureID,
+        gameBuild: GameBuildSignature
+    ) -> DaveTrainerOperationResult? {
+        guard let service = matchingService(for: gameBuild) else {
+            return unsupportedBuildResult(featureID: featureID, actual: gameBuild)
+        }
+        guard service.intentionallyUnsupportedFeatureIDs.contains(featureID) else {
+            return nil
+        }
+        return unsupportedFeatureResult(featureID: featureID, service: service)
+    }
+
+    func buildSupportFailure(
+        featureID: DaveTrainerFeatureID,
+        gameBuild: GameBuildSignature
+    ) -> DaveTrainerOperationResult? {
+        guard matchingService(for: gameBuild) == nil else {
+            return nil
+        }
+        return unsupportedBuildResult(featureID: featureID, actual: gameBuild)
+    }
+
+    func unsupportedReason(
+        featureID: DaveTrainerFeatureID,
+        gameBuild: GameBuildSignature
+    ) -> String? {
+        guard let service = matchingService(for: gameBuild) else {
+            return "当前构建没有精确 profile；仅可导出兼容报告。"
+        }
+        guard service.intentionallyUnsupportedFeatureIDs.contains(featureID) else {
+            return nil
+        }
+        return "此功能尚无 \(service.manifest.gameBuild.version) 的完整目标证据。"
+    }
+
+    func profileSummary(for gameBuild: GameBuildSignature) -> String? {
+        guard let service = matchingService(for: gameBuild) else {
+            return nil
+        }
+        let supportedCount = service.manifest.features.count
+        return "已匹配精确 profile：\(service.manifest.gameBuild.version)，已收录 \(supportedCount)/\(DaveTrainerFeatureID.allCases.count) 个功能的精确目标。"
+    }
+
+    private func matchingService(for build: GameBuildSignature) -> TrainerBuildOperationService? {
+        profileServices.first { build.matchesIdentity(of: $0.manifest.gameBuild) }
+    }
+
+    private func unsupportedBuildResult(
+        featureID: DaveTrainerFeatureID,
+        actual: GameBuildSignature
+    ) -> DaveTrainerOperationResult {
+        let supportedVersions = profileServices.map(\.manifest.gameBuild.version).joined(separator: ", ")
+        return DaveTrainerOperationResult(
+            featureID: featureID,
+            state: .unsupportedBuild,
+            targetIDs: [],
+            message: "当前游戏构建 \(actual.version) / \(actual.buildGUID) 尚无精确 profile；已阻止玩家写入。已收录：\(supportedVersions)。请导出兼容报告。"
+        )
+    }
+
+    private func unsupportedFeatureResult(
+        featureID: DaveTrainerFeatureID,
+        service: TrainerBuildOperationService
+    ) -> DaveTrainerOperationResult {
+        DaveTrainerOperationResult(
+            featureID: featureID,
+            state: .unsupportedBuild,
+            targetIDs: [],
+            message: "当前 \(service.manifest.gameBuild.version) profile 尚未验证功能 \(featureID.rawValue)；已阻止写入。可使用界面中未标记为不支持的功能，或继续导出兼容报告补充证据。"
+        )
+    }
+
+    private static func hasUniqueBuildIdentities(_ services: [TrainerBuildOperationService]) -> Bool {
+        for (index, service) in services.enumerated() {
+            let remaining = services.dropFirst(index + 1)
+            if remaining.contains(where: { $0.manifest.gameBuild.matchesIdentity(of: service.manifest.gameBuild) }) {
+                return false
+            }
+        }
+        return true
+    }
+}
+
+private final class TrainerBuildOperationService {
+    let manifest: DaveTrainerManifest
+    let intentionallyUnsupportedFeatureIDs: Set<DaveTrainerFeatureID>
+
     private let staticPatches: [String: StaticGamePatch]
     private let applier: StaticPatchApplying
     private let runtimeQuantityIncrementer: RuntimeQuantityIncrementing
@@ -91,8 +232,9 @@ final class TrainerOperationService {
     private let transactionEngine: PatchTransactionEngine
     private var activeValuePatches: [String: StaticGamePatch] = [:]
 
-    init(configuration: Configuration = .live()) {
+    init(configuration: TrainerOperationService.Configuration) {
         self.manifest = configuration.manifest
+        self.intentionallyUnsupportedFeatureIDs = configuration.intentionallyUnsupportedFeatureIDs
         self.staticPatches = configuration.staticPatches
         self.applier = configuration.applier
         self.runtimeQuantityIncrementer = configuration.runtimeQuantityIncrementer
@@ -105,6 +247,7 @@ final class TrainerOperationService {
         runtimeQuantityIncrementer.clearCachedAddresses()
         ingredientsIncrementer.clearCachedAddresses()
         jungleIngredientsIncrementer.clearCachedAddresses()
+        activeValuePatches.removeAll()
     }
 
     func apply(_ request: TrainerOperationRequest, context: TrainerOperationContext) throws -> DaveTrainerOperationResult {
@@ -124,13 +267,6 @@ final class TrainerOperationService {
                 targets: [],
                 message: "manifest 功能缺少目标：\(request.featureID.rawValue)。"
             ))
-        }
-
-        if let failure = buildCompatibilityFailure(
-            featureID: request.featureID,
-            gameBuild: context.gameBuild
-        ) {
-            return failure
         }
 
         return try applyValidated(request, context: context, feature: feature)
@@ -472,30 +608,6 @@ final class TrainerOperationService {
             state: .targetMismatch,
             targets: [],
             message: message
-        ))
-    }
-
-    func buildCompatibilityFailure(
-        featureID: DaveTrainerFeatureID,
-        gameBuild: GameBuildSignature
-    ) -> DaveTrainerOperationResult? {
-        guard let feature = manifest.feature(id: featureID),
-              feature.playerRuntimePolicy.requiresBuildMatch,
-              !gameBuild.matchesIdentity(of: manifest.gameBuild) else {
-            return nil
-        }
-        return unsupportedBuildResult(featureID: featureID, actual: gameBuild)
-    }
-
-    private func unsupportedBuildResult(
-        featureID: DaveTrainerFeatureID,
-        actual: GameBuildSignature
-    ) -> DaveTrainerOperationResult {
-        result(OperationResultDraft(
-            featureID: featureID,
-            state: .unsupportedBuild,
-            targets: [],
-            message: "当前游戏构建 \(actual.version) / \(actual.buildGUID) 尚无已验证补丁 profile；已阻止使用 \(manifest.gameBuild.version) 的地址写入。请点击“导出兼容报告”并将 JSON 附到 issue #2。"
         ))
     }
 

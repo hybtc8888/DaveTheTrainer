@@ -1,8 +1,8 @@
 import CryptoKit
 import Foundation
 
-private let compatibilityReportSchemaVersion = "1.0"
-private let compatibilitySymbolByteCount = 32
+private let compatibilityReportSchemaVersion = "1.1"
+private let compatibilitySymbolByteCount = 1024
 private let fileHashChunkByteCount = 1024 * 1024
 private let gameAssemblyRelativePath = "Frameworks/GameAssembly.dylib"
 
@@ -29,8 +29,27 @@ public struct DaveCompatibilityProfile: Equatable, Sendable {
 
     public static let current = DaveCompatibilityProfile(
         manifest: .current,
-        patches: DefaultStaticGamePatches.make()
+        patches: makeCurrentPatches()
     )
+
+    private static func makeCurrentPatches() -> [StaticGamePatch] {
+        DefaultStaticGamePatches.make() + [
+            requiredValuePatch(id: "swimSpeed", valueText: "5"),
+            requiredValuePatch(id: "gold", valueText: "99999"),
+            requiredValuePatch(id: "bei", valueText: "99999"),
+            requiredValuePatch(id: "jungleGold", valueText: "99999"),
+            requiredValuePatch(id: "materials", valueText: "999"),
+            requiredValuePatch(id: "artisan", valueText: "999")
+        ]
+    }
+
+    private static func requiredValuePatch(id: String, valueText: String) -> StaticGamePatch {
+        do {
+            return try DefaultStaticGamePatches.makeValuePatch(id: id, valueText: valueText)
+        } catch {
+            preconditionFailure("Invalid compatibility patch \(id): \(error.localizedDescription)")
+        }
+    }
 }
 
 public struct DaveCompatibilityReportRequest: Equatable, Sendable {
@@ -108,6 +127,7 @@ public struct DaveCompatibilityObservedBytes: Codable, Equatable, Sendable {
 public struct DaveCompatibilitySymbolCandidate: Codable, Equatable, Sendable {
     public let rva: String
     public let observation: DaveCompatibilityObservedBytes
+    public let matchingExpectedRVAs: [String]
 }
 
 public struct DaveCompatibilitySymbolDiscovery: Codable, Equatable, Sendable {
@@ -278,7 +298,7 @@ public final class DaveCompatibilityReportGenerator: DaveCompatibilityReportGene
             patch.points.enumerated().map { index, point in
                 CompatibilityPatchPointDescriptor(
                     patchID: patch.id,
-                    pointID: "\(patch.id).\(index)",
+                    pointID: point.resolvedTargetID(patchID: patch.id, fallbackIndex: index),
                     point: point,
                     symbolPrefix: symbolPrefix(for: point.note)
                 )
@@ -313,7 +333,11 @@ public final class DaveCompatibilityReportGenerator: DaveCompatibilityReportGene
             )
             let observation = observedBytes(reads[descriptor.pointID])
             let discovery = descriptor.symbolPrefix.map {
-                symbolDiscovery(prefix: $0, inspection: inspection)
+                symbolDiscovery(
+                    prefix: $0,
+                    expectedBytes: descriptor.point.expectedBytes,
+                    inspection: inspection
+                )
             }
             let pointEvidence = DaveCompatibilityPatchPointEvidence(
                 baseline: baseline,
@@ -333,6 +357,7 @@ public final class DaveCompatibilityReportGenerator: DaveCompatibilityReportGene
 
     private static func symbolDiscovery(
         prefix: String,
+        expectedBytes: [UInt8],
         inspection: MachOBinaryInspection
     ) -> DaveCompatibilitySymbolDiscovery {
         let evidence = inspection.symbolsByPrefix[prefix] ?? []
@@ -340,13 +365,39 @@ public final class DaveCompatibilityReportGenerator: DaveCompatibilityReportGene
         for candidate in evidence {
             candidatesByRVA[candidate.symbol.address] = DaveCompatibilitySymbolCandidate(
                 rva: hexRVA(candidate.symbol.address),
-                observation: observedBytes(candidate.result)
+                observation: observedBytes(candidate.result),
+                matchingExpectedRVAs: matchingExpectedRVAs(
+                    baseRVA: candidate.symbol.address,
+                    result: candidate.result,
+                    expectedBytes: expectedBytes
+                )
             )
         }
         return DaveCompatibilitySymbolDiscovery(
             prefix: prefix,
             candidates: candidatesByRVA.sorted { $0.key < $1.key }.map(\.value)
         )
+    }
+
+    private static func matchingExpectedRVAs(
+        baseRVA: UInt64,
+        result: MachOByteReadResult,
+        expectedBytes: [UInt8]
+    ) -> [String] {
+        guard case .bytes(let bytes) = result,
+              !expectedBytes.isEmpty,
+              bytes.count >= expectedBytes.count else {
+            return []
+        }
+        let lastOffset = bytes.count - expectedBytes.count
+        return stride(from: 0, through: lastOffset, by: MemoryLayout<UInt32>.size).compactMap { offset in
+            let endIndex = offset + expectedBytes.count
+            guard bytes[offset..<endIndex].elementsEqual(expectedBytes) else {
+                return nil
+            }
+            let (rva, overflow) = baseRVA.addingReportingOverflow(UInt64(offset))
+            return overflow ? nil : hexRVA(rva)
+        }
     }
 
     private static func observedBytes(_ result: MachOByteReadResult?) -> DaveCompatibilityObservedBytes {

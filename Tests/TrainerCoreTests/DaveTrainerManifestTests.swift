@@ -18,6 +18,50 @@ final class DaveTrainerManifestTests: XCTestCase {
         })
     }
 
+    func testV106710ManifestExposesOnlyReportVerifiedFeatures() {
+        let manifest = DaveTrainerManifest.v106710
+        let supportedFeatureIDs = Set(manifest.features.map(\.id))
+
+        XCTAssertEqual(manifest.gameBuild.version, "v1.0.6.710.mac")
+        XCTAssertEqual(manifest.gameBuild.buildGUID, "fd04739b28e64f148c3efcd479a839b8")
+        XCTAssertEqual(
+            manifest.moduleIdentity(id: DaveTrainerManifest.gameAssemblyModuleID)?.machoUUID,
+            "266578BA-B451-313B-8326-CF241BB3FA5F"
+        )
+        XCTAssertEqual(supportedFeatureIDs, [
+            .god,
+            .oxygen,
+            .ammo,
+            .crabTraps,
+            .weight,
+            .drones,
+            .stamina,
+            .wasabi
+        ])
+        XCTAssertNil(manifest.feature(id: .divingGod))
+        XCTAssertNil(manifest.feature(id: .damage))
+        XCTAssertNil(manifest.feature(id: .swimSpeed))
+        XCTAssertNil(manifest.feature(id: .gold))
+    }
+
+    func testV106710PatchCatalogKeepsStableEvidenceIDs() {
+        let patches = DaveV106710StaticGamePatches.make()
+        let points = patches.flatMap(\.points)
+        let pointsByID = Dictionary(uniqueKeysWithValues: points.compactMap { point in
+            point.targetID.map { ($0, point) }
+        })
+
+        XCTAssertEqual(patches.count, 8)
+        XCTAssertEqual(points.count, 59)
+        XCTAssertEqual(pointsByID.count, points.count)
+        XCTAssertEqual(pointsByID["god.0"]?.rva, 0x0B85_378)
+        XCTAssertEqual(pointsByID["ammo.5"]?.rva, 0x1B4E_A30)
+        XCTAssertEqual(pointsByID["weight.13"]?.rva, 0x20A4_65C)
+        XCTAssertEqual(pointsByID["wasabi.0"]?.rva, 0x2152_C68)
+        XCTAssertTrue(points.allSatisfy { $0.trampoline == nil })
+        XCTAssertTrue(points.allSatisfy { $0.patchBytes.count <= $0.expectedBytes.count })
+    }
+
     func testCurrentManifestDeclaresGameAssemblyModuleIdentity() throws {
         let module = try XCTUnwrap(DaveTrainerManifest.current.moduleIdentity(id: DaveTrainerManifest.gameAssemblyModuleID))
 

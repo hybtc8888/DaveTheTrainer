@@ -17,6 +17,103 @@ final class TrainerOperationServiceTests: XCTestCase {
         XCTAssertTrue(applier.requests.isEmpty)
     }
 
+    func testMultipleBuildProfilesRouteV106710ToItsExactPatchSet() throws {
+        let baselineApplier = RecordingTrainerOperationApplier()
+        let v106710Applier = RecordingTrainerOperationApplier()
+        let service = TrainerOperationService(configurations: [
+            .test(applier: baselineApplier),
+            .v106710(applier: v106710Applier)
+        ])
+
+        let result = try service.apply(
+            TrainerOperationRequest(
+                featureID: .oxygen,
+                isEnabled: true,
+                payload: .staticPatch(patchID: "oxygen")
+            ),
+            context: TrainerOperationContext(session: Self.session(), gameBuild: KnownGameBuild.v106710)
+        )
+
+        XCTAssertEqual(result.state, .bytesApplied)
+        XCTAssertEqual(result.targetIDs, ["oxygen.0", "oxygen.1", "oxygen.2", "oxygen.3"])
+        XCTAssertEqual(v106710Applier.requests.map(\.patch.id), result.targetIDs)
+        XCTAssertEqual(v106710Applier.requests.map { $0.patch.points[0].rva }, [
+            0x13F2_AD0,
+            0x13F5_78C,
+            0x1B60_BE8,
+            0x1B6A_468
+        ])
+        XCTAssertTrue(baselineApplier.preflightRequests.isEmpty)
+        XCTAssertTrue(baselineApplier.requests.isEmpty)
+    }
+
+    func testV106710UnsupportedFeatureIsRejectedWithoutWritingMemory() throws {
+        let applier = RecordingTrainerOperationApplier()
+        let service = TrainerOperationService(configuration: .v106710(applier: applier))
+
+        let result = try service.apply(
+            TrainerOperationRequest(
+                featureID: .damage,
+                isEnabled: true,
+                payload: .staticPatch(patchID: "damage")
+            ),
+            context: TrainerOperationContext(session: Self.session(), gameBuild: KnownGameBuild.v106710)
+        )
+
+        XCTAssertEqual(result.state, .unsupportedBuild)
+        XCTAssertTrue(result.message.contains("尚未验证功能 damage"))
+        XCTAssertTrue(applier.preflightRequests.isEmpty)
+        XCTAssertTrue(applier.requests.isEmpty)
+    }
+
+    func testKnownPartialProfileCanPrepareBeforeSelectingAFeature() {
+        let service = TrainerOperationService(configuration: .v106710(
+            applier: RecordingTrainerOperationApplier()
+        ))
+
+        XCTAssertNil(service.buildSupportFailure(
+            featureID: .divingGod,
+            gameBuild: KnownGameBuild.v106710
+        ))
+        XCTAssertNotNil(service.buildCompatibilityFailure(
+            featureID: .divingGod,
+            gameBuild: KnownGameBuild.v106710
+        ))
+    }
+
+    func testClearingRuntimeCachesAlsoClearsActiveValuePatchState() throws {
+        let applier = RecordingTrainerOperationApplier()
+        let service = TrainerOperationService(configuration: .test(applier: applier))
+        let context = TrainerOperationContext(
+            session: Self.session(),
+            gameBuild: KnownGameBuild.current
+        )
+
+        _ = try service.apply(
+            TrainerOperationRequest(
+                featureID: .swimSpeed,
+                isEnabled: true,
+                payload: .valuePatch(patchID: "swimSpeed", valueText: "5")
+            ),
+            context: context
+        )
+        service.clearRuntimeCaches()
+        _ = try service.apply(
+            TrainerOperationRequest(
+                featureID: .swimSpeed,
+                isEnabled: false,
+                payload: .valuePatch(patchID: "swimSpeed", valueText: "7")
+            ),
+            context: context
+        )
+
+        let expectedRestorePatch = try DefaultStaticGamePatches.makeValuePatch(
+            id: "swimSpeed",
+            valueText: "7"
+        )
+        XCTAssertEqual(applier.requests.last?.patch, expectedRestorePatch)
+    }
+
     func testUnknownManifestFeatureReturnsTargetMismatchWithoutWritingMemory() throws {
         let applier = RecordingTrainerOperationApplier()
         let manifest = DaveTrainerManifest(schemaVersion: "1.0", gameBuild: KnownGameBuild.current, features: [])
@@ -343,7 +440,25 @@ private extension TrainerOperationService.Configuration {
             applier: applier,
             runtimeQuantityIncrementer: runtimeQuantityIncrementer,
             ingredientsIncrementer: ingredientsIncrementer,
-            jungleIngredientsIncrementer: jungleIngredientsIncrementer
+            jungleIngredientsIncrementer: jungleIngredientsIncrementer,
+            intentionallyUnsupportedFeatureIDs: []
+        )
+    }
+
+    static func v106710(applier: StaticPatchApplying) -> TrainerOperationService.Configuration {
+        let manifest = DaveTrainerManifest.v106710
+        return TrainerOperationService.Configuration(
+            manifest: manifest,
+            staticPatches: Dictionary(
+                uniqueKeysWithValues: DaveV106710StaticGamePatches.make().map { ($0.id, $0) }
+            ),
+            applier: applier,
+            runtimeQuantityIncrementer: RecordingRuntimeQuantityIncrementer(),
+            ingredientsIncrementer: RecordingIngredientsInventoryIncrementer(),
+            jungleIngredientsIncrementer: RecordingJungleIngredientsInventoryIncrementer(),
+            intentionallyUnsupportedFeatureIDs: Set(DaveTrainerFeatureID.allCases).subtracting(
+                manifest.features.map(\.id)
+            )
         )
     }
 }

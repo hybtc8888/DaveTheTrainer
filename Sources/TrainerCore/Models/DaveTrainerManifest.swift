@@ -197,6 +197,21 @@ public struct DaveTrainerManifest: Equatable, Codable, Sendable {
         ],
         features: DaveTrainerManifestFactory.makeCurrentFeatures()
     )
+
+    public static let v106710 = DaveTrainerManifest(
+        schemaVersion: currentSchemaVersion,
+        gameBuild: KnownGameBuild.v106710,
+        moduleIdentities: [
+            DaveModuleIdentity(
+                id: gameAssemblyModuleID,
+                moduleName: "GameAssembly.dylib",
+                architecture: "arm64",
+                machoUUID: "266578BA-B451-313B-8326-CF241BB3FA5F",
+                pathMatchPolicy: "image-name"
+            )
+        ],
+        features: DaveTrainerManifestFactory.makeV106710Features()
+    )
 }
 
 private enum DaveTrainerManifestFactory {
@@ -228,6 +243,22 @@ private enum DaveTrainerManifestFactory {
         ]
     }
 
+    static func makeV106710Features() -> [DaveTrainerManifestFeature] {
+        let staticPatches = Dictionary(
+            uniqueKeysWithValues: DaveV106710StaticGamePatches.make().map { ($0.id, $0) }
+        )
+        return [
+            codeFeature(.god, title: "无敌/忽略伤害", patchID: "god", in: staticPatches),
+            codeFeature(.oxygen, title: "无限氧气", patchID: "oxygen", in: staticPatches),
+            codeFeature(.ammo, title: "无限弹药/鱼叉资源", patchID: "ammo", in: staticPatches),
+            codeFeature(.crabTraps, title: "无限鱼笼", patchID: "crabTraps", in: staticPatches),
+            codeFeature(.weight, title: "无限负重", patchID: "weight", in: staticPatches),
+            codeFeature(.drones, title: "无限无人机", patchID: "drones", in: staticPatches),
+            codeFeature(.stamina, title: "无限体力", patchID: "stamina", in: staticPatches),
+            codeFeature(.wasabi, title: "无限芥末", patchID: "wasabi", in: staticPatches)
+        ]
+    }
+
     private static func codeFeature(_ id: DaveTrainerFeatureID, title: String, patchID: String, in patchesByID: [String: StaticGamePatch]) -> DaveTrainerManifestFeature {
         codeFeature(id, title: title, patch: requiredPatch(id: patchID, in: patchesByID))
     }
@@ -240,7 +271,7 @@ private enum DaveTrainerManifestFactory {
         let targets = patches.flatMap { patch in
             patch.points.enumerated().map { index, point in
                 DaveTrainerManifestTarget.patchPoint(DaveManifestPatchPoint(
-                    id: "\(patch.id).\(index)",
+                    id: point.resolvedTargetID(patchID: patch.id, fallbackIndex: index),
                     moduleID: DaveTrainerManifest.gameAssemblyModuleID,
                     point: point
                 ))

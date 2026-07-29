@@ -121,6 +121,17 @@ final class PlayerPathContractTests: XCTestCase {
         XCTAssertEqual(memoryAccess.attachCount, 0)
     }
 
+    func testPartialBuildDisablesOnlyFeaturesWithoutExactEvidence() throws {
+        let store = AppStore(dependencies: .test(install: Self.v106710Install))
+        let god = try XCTUnwrap(SimpleTrainerOptions.diving.first { $0.id == "god" })
+        let damage = try XCTUnwrap(SimpleTrainerOptions.diving.first { $0.id == "damage" })
+
+        XCTAssertNil(store.unsupportedReason(for: god))
+        XCTAssertTrue(store.unsupportedReason(for: damage)?.contains("v1.0.6.710.mac") == true)
+        XCTAssertTrue(store.logs.contains { $0.contains("已收录 8/22 个功能") })
+        XCTAssertFalse(store.latestMessageIsError)
+    }
+
     private static var unsupportedInstall: GameInstall {
         GameInstall(
             outerAppURL: URL(fileURLWithPath: "/Applications/DaveTheDiver.app", isDirectory: true),
@@ -136,6 +147,14 @@ final class PlayerPathContractTests: XCTestCase {
                     metadataPath: KnownGameBuild.current.metadataPath
                 )
             )
+        )
+    }
+
+    private static var v106710Install: GameInstall {
+        GameInstall(
+            outerAppURL: URL(fileURLWithPath: "/Applications/DaveTheDiver.app", isDirectory: true),
+            innerAppURL: URL(fileURLWithPath: KnownGameBuild.v106710.executablePath).deletingLastPathComponent(),
+            signature: KnownGameBuild.v106710
         )
     }
 

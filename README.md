@@ -33,6 +33,7 @@ but memory writes require an exact reviewed profile.
 | App type | Native SwiftUI app |
 | Package manager | Swift Package Manager |
 | Validated baseline build | `v1.0.6.675.mac` |
+| Evidence-backed partial build | `v1.0.6.710.mac` |
 | Target module | `GameAssembly.dylib` |
 | Manifest schema | `1.0` |
 | Test coverage | XCTest coverage for manifest policy, patch transactions, runtime incrementers, release scripts, and player path contracts |
@@ -49,7 +50,7 @@ release notes before running the app.
 
 Install from a release zip:
 
-1. Download `DaveTheTrainer-v0.1.3-macOS.zip` from the latest release.
+1. Download `DaveTheTrainer-v0.1.4-macOS.zip` from the latest release.
 2. Unzip it.
 3. Move `DaveTheTrainer.app` to `/Applications` or `$HOME/Applications`.
 4. Start the supported macOS build of `DAVE THE DIVER`.
@@ -65,10 +66,23 @@ xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
 
 ## Compatibility Boundary
 
-This repository's fully validated profile is `v1.0.6.675.mac`. The trainer may
-be installed anywhere, and it resolves Steam custom libraries and standalone
-Unity bundles from the running process. This path flexibility does not make
-fixed patch RVAs portable across game updates.
+This repository's fully validated profile is `v1.0.6.675.mac`. It also contains
+an evidence-backed partial profile for `v1.0.6.710.mac`, derived from the
+compatibility report attached to issue #2. The trainer may be installed
+anywhere, and it resolves Steam custom libraries and standalone Unity bundles
+from the running process. This path flexibility does not make fixed patch RVAs
+portable across game updates.
+
+| Game build | Coverage |
+| --- | --- |
+| `v1.0.6.675.mac` | Full baseline profile |
+| `v1.0.6.710.mac` | Exact targets for god mode, oxygen, ammo, crab traps, weight, drones, stamina, and wasabi; other controls are disabled |
+
+The `.710` targets are byte-verified against the reporter's GameAssembly and
+guarded by its exact UUID. They have not been behavior-tested on the maintainer's
+machine because that game build is not locally available. Enable its supported
+features individually and treat `bytesApplied` as distinct from in-game
+behavior confirmation. See [the evidence note](docs/compatibility-v1.0.6.710.mac.md).
 
 Player memory writes require the manifest's exact bundle ID, version, build
 GUID, and GameAssembly arm64 UUID. An unknown build remains detectable and can
@@ -131,7 +145,7 @@ swift test
 `script/build_and_run.sh` builds the SwiftPM executable, stages a real
 `DaveTheTrainer.app` bundle, signs it, copies the latest app to
 `${DAVE_TRAINER_LOCAL_APP_DIR:-$HOME/Applications}`, mirrors the artifact under
-`dist/`, creates `dist/DaveTheTrainer-v0.1.3-macOS.zip`, and launches the app.
+`dist/`, creates `dist/DaveTheTrainer-v0.1.4-macOS.zip`, and launches the app.
 
 To choose a different local app destination:
 
@@ -164,9 +178,11 @@ DAVE_TRAINER_SIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
 3. Confirm that the app detects the game process and build fingerprint.
 4. If the build is unsupported, click **Export Compatibility Report** and
    attach the JSON to the compatibility issue; no player writes will run.
-5. On a supported build, apply only the one-click trainer operation you intend
+5. On a partial profile, controls without exact evidence are disabled. Test the
+   enabled controls individually rather than using a combined mode.
+6. On a supported build, apply only the one-click trainer operation you intend
    to use.
-6. If macOS asks for administrator authorization, review the prompt and allow
+7. If macOS asks for administrator authorization, review the prompt and allow
    it only for the trainer attach/read/write operation.
 
 The trainer derives the actual `.app` from the running game executable first,
@@ -192,7 +208,7 @@ administrator authorization for task access and process memory writes.
 
 The app does not upload telemetry, memory dumps, save files, API keys, crash
 logs, or diagnostics. The compatibility exporter writes a local JSON containing
-build fingerprints and small, targeted manifest byte samples. It omits absolute
+build fingerprints and targeted manifest byte samples. It omits absolute
 paths and full extracted symbol names. Other logs or manually collected data
 should still be redacted before publication.
 
@@ -254,6 +270,7 @@ output.
 - [Resource Capabilities](docs/resource-capabilities.md)
 - [Inventory Taxonomy](docs/inventory-taxonomy.md)
 - [Development Fixtures](docs/development-fixtures.md)
+- [v1.0.6.710.mac Compatibility Evidence](docs/compatibility-v1.0.6.710.mac.md)
 
 ## Security
 

@@ -53,7 +53,7 @@ public struct GameBuildSignature: Equatable, Codable, Sendable {
 }
 
 public enum KnownGameBuild {
-    public static let current = GameBuildSignature(
+    public static let v106675 = GameBuildSignature(
         identity: GameBuildIdentity(
             bundleID: "com.nexon.dave",
             version: "v1.0.6.675.mac",
@@ -64,4 +64,18 @@ public enum KnownGameBuild {
             metadataPath: "/Applications/DaveTheDiver.app/Contents/Game/DaveTheDiver.app/Contents/Resources/Data/il2cpp_data/Metadata/global-metadata.dat"
         )
     )
+
+    public static let v106710 = GameBuildSignature(
+        identity: GameBuildIdentity(
+            bundleID: "com.nexon.dave",
+            version: "v1.0.6.710.mac",
+            buildGUID: "fd04739b28e64f148c3efcd479a839b8"
+        ),
+        paths: GameBuildPaths(
+            executablePath: "/Applications/DaveTheDiver.app/Contents/Game/DaveTheDiver.app/Contents/MacOS/DAVE THE DIVER",
+            metadataPath: "/Applications/DaveTheDiver.app/Contents/Game/DaveTheDiver.app/Contents/Resources/Data/il2cpp_data/Metadata/global-metadata.dat"
+        )
+    )
+
+    public static let current = v106675
 }

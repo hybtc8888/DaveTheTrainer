@@ -35,6 +35,7 @@ public struct StaticPatchTrampoline: Equatable, Codable, Sendable {
 }
 
 public struct StaticPatchPoint: Equatable, Codable, Sendable {
+    public let targetID: String?
     public let rva: UInt64
     public let expectedBytes: [UInt8]
     public let patchBytes: [UInt8]
@@ -50,8 +51,10 @@ public struct StaticPatchPoint: Equatable, Codable, Sendable {
         note: String,
         acceptsLegacyIntReturnPatch: Bool = false,
         acceptsCompatibleAppliedPatch: Bool = false,
-        trampoline: StaticPatchTrampoline? = nil
+        trampoline: StaticPatchTrampoline? = nil,
+        targetID: String? = nil
     ) {
+        self.targetID = targetID
         self.rva = rva
         self.expectedBytes = expectedBytes
         self.patchBytes = patchBytes
@@ -59,6 +62,10 @@ public struct StaticPatchPoint: Equatable, Codable, Sendable {
         self.acceptsLegacyIntReturnPatch = acceptsLegacyIntReturnPatch
         self.acceptsCompatibleAppliedPatch = acceptsCompatibleAppliedPatch
         self.trampoline = trampoline
+    }
+
+    public func resolvedTargetID(patchID: String, fallbackIndex: Int) -> String {
+        targetID ?? "\(patchID).\(fallbackIndex)"
     }
 }
 

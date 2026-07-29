@@ -69,7 +69,7 @@ public final class PatchTransactionEngine {
         patches.flatMap { patch in
             patch.points.enumerated().map { index, point in
                 StaticGamePatch(
-                    id: "\(patch.id).\(index)",
+                    id: point.resolvedTargetID(patchID: patch.id, fallbackIndex: index),
                     title: "\(patch.title) #\(index)",
                     points: [point]
                 )

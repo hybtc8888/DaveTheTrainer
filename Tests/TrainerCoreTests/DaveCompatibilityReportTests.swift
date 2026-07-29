@@ -19,10 +19,15 @@ final class DaveCompatibilityReportTests: XCTestCase {
         ))
 
         XCTAssertFalse(report.context.baseline.matchesDetectedBuild)
+        XCTAssertEqual(report.schemaVersion, "1.1")
         XCTAssertEqual(report.context.detected.build.version, "v1.0.6.710.mac")
         XCTAssertEqual(report.patches.first?.evidence.observation.bytes, "AA BB CC DD EE FF 00 11")
         XCTAssertEqual(report.patches.first?.evidence.symbolDiscovery?.prefix, "_PlayerCharacter_SetHPDamage_m")
         XCTAssertEqual(report.patches.first?.evidence.symbolDiscovery?.candidates.first?.rva, "0xC0FFEE")
+        XCTAssertEqual(
+            report.patches.first?.evidence.symbolDiscovery?.candidates.first?.matchingExpectedRVAs,
+            ["0xC0FFFE"]
+        )
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -61,6 +66,15 @@ final class DaveCompatibilityReportTests: XCTestCase {
         ))
 
         XCTAssertTrue(report.context.baseline.matchesDetectedBuild)
+    }
+
+    func testCurrentProfileIncludesRepresentativeValuePatchEvidence() {
+        let patches = DaveCompatibilityProfile.current.patches
+        let patchIDs = patches.map(\.id)
+
+        XCTAssertEqual(Set(patchIDs).count, patchIDs.count)
+        XCTAssertTrue(Set(["swimSpeed", "gold", "bei", "jungleGold", "materials", "artisan"]).isSubset(of: patchIDs))
+        XCTAssertGreaterThan(patches.flatMap(\.points).count, DefaultStaticGamePatches.make().flatMap(\.points).count)
     }
 
     private static func patch() -> StaticGamePatch {
@@ -112,9 +126,11 @@ private struct FakeCompatibilityMachOInspector: CompatibilityMachOInspecting {
             type: 0x0E,
             sectionIndex: 1
         )
+        var symbolBytes = Array(repeating: UInt8(0x42), count: request.symbolByteCount)
+        symbolBytes.replaceSubrange(16..<24, with: [0xFF, 0xC3, 0x01, 0xD1, 0xEB, 0x2B, 0x02, 0x6D])
         let symbolRead = MachOSymbolReadEvidence(
             symbol: symbol,
-            result: .bytes(Array(repeating: 0x42, count: request.symbolByteCount))
+            result: .bytes(symbolBytes)
         )
         let symbols = Dictionary(uniqueKeysWithValues: request.symbolPrefixes.map { ($0, [symbolRead]) })
         return MachOBinaryInspection(uuid: uuid, byteReads: reads, symbolsByPrefix: symbols)

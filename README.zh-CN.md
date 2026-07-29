@@ -16,7 +16,8 @@
 DaveTheTrainer 是一个原生 macOS SwiftUI 修改器。它不是通用内存扫描器，也不是
 Cheat Engine 风格工具。玩家按钮都绑定到已审查的 manifest feature、已验证的
 Mach-O 模块形态、确定的补丁点或运行时对象路径。安装路径可以变化，但玩家内存写入
-必须匹配经过审核的精确构建 profile。`v1.0.6.675.mac` 是当前已完整验证的 profile。
+必须匹配经过审核的精确构建 profile。`v1.0.6.675.mac` 是完整验证的 profile，
+`v1.0.6.710.mac` 是根据 issue #2 报告建立的部分兼容 profile。
 
 > 本项目与 MINTROCKET、Nexon 或 `DAVE THE DIVER` 创作者没有隶属、赞助、
 > 背书或官方合作关系。
@@ -29,6 +30,7 @@ Mach-O 模块形态、确定的补丁点或运行时对象路径。安装路径�
 | 应用类型 | 原生 SwiftUI app |
 | 包管理 | Swift Package Manager |
 | 已验证基线版本 | `v1.0.6.675.mac` |
+| 报告证据支持的部分版本 | `v1.0.6.710.mac` |
 | 目标模块 | `GameAssembly.dylib` |
 | Manifest schema | `1.0` |
 | 测试 | 覆盖 manifest 策略、事务补丁、运行时增量、发布脚本和玩家路径契约 |
@@ -44,7 +46,7 @@ Mach-O 模块形态、确定的补丁点或运行时对象路径。安装路径�
 
 安装步骤：
 
-1. 从最新 Release 下载 `DaveTheTrainer-v0.1.3-macOS.zip`。
+1. 从最新 Release 下载 `DaveTheTrainer-v0.1.4-macOS.zip`。
 2. 解压 zip。
 3. 把 `DaveTheTrainer.app` 移动到 `/Applications` 或 `$HOME/Applications`。
 4. 启动 macOS 版 `DAVE THE DIVER`。
@@ -61,6 +63,15 @@ xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
 当前仓库完整验证的 profile 是 `v1.0.6.675.mac`。修改器可以从运行进程识别 Steam
 自定义库、任意安装目录和独立 Unity app bundle，但安装路径兼容不代表固定补丁 RVA
 可以跨游戏更新复用。
+
+| 游戏构建 | 覆盖范围 |
+| --- | --- |
+| `v1.0.6.675.mac` | 完整基线 profile |
+| `v1.0.6.710.mac` | 无敌、氧气、弹药、鱼笼、负重、无人机、体力和芥末的精确目标；其他控件禁用 |
+
+`.710` 目标已与用户报告中的 GameAssembly 字节证据逐点核对，并绑定其精确 UUID。
+由于维护者本机没有该版本，尚未完成实际游戏行为验证。请逐项测试已启用功能，不要把
+`bytesApplied` 等同于游戏内效果已确认。详见 [兼容证据说明](docs/compatibility-v1.0.6.710.mac.md)。
 
 玩家内存写入必须精确匹配 manifest 中的 bundle ID、版本、build GUID 和 GameAssembly
 arm64 UUID。未知构建仍可被识别并用于诊断，但会在读取或修改旧 RVA 前拒绝玩家写入。
@@ -85,8 +96,9 @@ arm64 UUID。未知构建仍可被识别并用于诊断，但会在读取或修�
 2. 启动 `DaveTheTrainer`。
 3. 确认修改器检测到游戏进程和 build fingerprint。
 4. 如果提示构建不支持，点击“导出兼容报告”，把 JSON 附到兼容性 issue；此时不会执行玩家写入。
-5. 在受支持构建上，只点击你确实要使用的一键功能。
-6. 如果 macOS 请求管理员权限，请确认它只用于目标进程 attach/read/write 操作。
+5. 在部分 profile 上，没有精确证据的控件会被禁用；请逐项测试可用功能，不要使用组合模式。
+6. 在受支持构建上，只点击你确实要使用的一键功能。
+7. 如果 macOS 请求管理员权限，请确认它只用于目标进程 attach/read/write 操作。
 
 修改器会优先从正在运行的游戏进程反向定位实际 `.app`，因此支持 Steam 自定义库、
 非 `/Applications` 安装目录和直接运行的 Unity app bundle。进程只按名称找到时仍只是候选；
@@ -106,7 +118,7 @@ DaveTheTrainer 会修改本机正在运行的游戏进程。macOS 可能要求�
 用于 task access 和进程内存读写。
 
 应用不会上传 telemetry、内存 dump、存档、API key、崩溃日志或诊断信息。兼容报告只会
-在用户点击后写成本地 JSON，其中包含构建指纹和少量 manifest 目标字节，不含绝对路径和
+在用户点击后写成本地 JSON，其中包含构建指纹和定向的 manifest 目标字节，不含绝对路径和
 完整提取符号名。其他日志或手工收集的数据在公开前仍应脱敏。
 
 详细说明见 [Permissions And Privacy](docs/permissions-and-privacy.md)。
@@ -123,7 +135,7 @@ swift test
 `script/build_and_run.sh` 会构建 SwiftPM executable，生成真实的
 `DaveTheTrainer.app` bundle，签名，复制到
 `${DAVE_TRAINER_LOCAL_APP_DIR:-$HOME/Applications}`，同时在 `dist/` 下生成
-`DaveTheTrainer-v0.1.3-macOS.zip`。
+`DaveTheTrainer-v0.1.4-macOS.zip`。
 
 GitHub Actions 运行公开测试套件，并跳过需要本机游戏安装或专有游戏文件的测试：
 
@@ -174,6 +186,7 @@ Assets/                应用图标资源
 - [Resource Capabilities](docs/resource-capabilities.md)
 - [Inventory Taxonomy](docs/inventory-taxonomy.md)
 - [Development Fixtures](docs/development-fixtures.md)
+- [v1.0.6.710.mac 兼容证据](docs/compatibility-v1.0.6.710.mac.md)
 
 ## License
 

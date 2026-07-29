@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v0.1.4 - 2026-07-30
+
+- Add an exact, report-derived partial profile for `v1.0.6.710.mac`, bound to its build GUID and GameAssembly arm64 UUID.
+- Enable 59 byte-verified targets across god mode, oxygen, ammo, crab traps, weight, drones, stamina, and wasabi; keep every unproven feature explicitly disabled.
+- Route player operations through the matching per-build manifest and module resolver instead of one global baseline profile.
+- Preserve stable target IDs when a newer build supports only a reviewed subset of an older multi-point patch.
+- Show per-feature compatibility limits in the player UI and allow preparation/attach for a known partial profile.
+- Expand compatibility report schema `1.1` to inspect 1024-byte symbol windows, emit exact matching candidate RVAs, and include representative speed, currency, material, and artisan targets.
+- Clear enabled toggle and value-patch state when a process session is replaced.
+
 ## v0.1.3 - 2026-07-28
 
 - Reject unknown game builds before any player memory write instead of applying stale baseline RVAs.
