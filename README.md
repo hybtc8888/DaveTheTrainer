@@ -50,7 +50,7 @@ release notes before running the app.
 
 Install from a release zip:
 
-1. Download `DaveTheTrainer-v0.1.4-macOS.zip` from the latest release.
+1. Download `DaveTheTrainer-v0.1.5-macOS.zip` from the latest release.
 2. Unzip it.
 3. Move `DaveTheTrainer.app` to `/Applications` or `$HOME/Applications`.
 4. Start the supported macOS build of `DAVE THE DIVER`.
@@ -76,7 +76,7 @@ portable across game updates.
 | Game build | Coverage |
 | --- | --- |
 | `v1.0.6.675.mac` | Full baseline profile |
-| `v1.0.6.710.mac` | Exact targets for god mode, oxygen, ammo, crab traps, weight, drones, stamina, and wasabi; other controls are disabled |
+| `v1.0.6.710.mac` | 72 exact targets for god mode, oxygen, ammo, crab traps, weight, partial player speed, drones, stamina, and wasabi; other controls are disabled |
 
 The `.710` targets are byte-verified against the reporter's GameAssembly and
 guarded by its exact UUID. They have not been behavior-tested on the maintainer's
@@ -145,7 +145,7 @@ swift test
 `script/build_and_run.sh` builds the SwiftPM executable, stages a real
 `DaveTheTrainer.app` bundle, signs it, copies the latest app to
 `${DAVE_TRAINER_LOCAL_APP_DIR:-$HOME/Applications}`, mirrors the artifact under
-`dist/`, creates `dist/DaveTheTrainer-v0.1.4-macOS.zip`, and launches the app.
+`dist/`, creates `dist/DaveTheTrainer-v0.1.5-macOS.zip`, and launches the app.
 
 To choose a different local app destination:
 

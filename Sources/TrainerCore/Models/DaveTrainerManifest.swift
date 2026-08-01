@@ -253,6 +253,11 @@ private enum DaveTrainerManifestFactory {
             codeFeature(.ammo, title: "无限弹药/鱼叉资源", patchID: "ammo", in: staticPatches),
             codeFeature(.crabTraps, title: "无限鱼笼", patchID: "crabTraps", in: staticPatches),
             codeFeature(.weight, title: "无限负重", patchID: "weight", in: staticPatches),
+            codeFeature(
+                .swimSpeed,
+                title: "设置玩家移动速度",
+                patch: v106710ValuePatch(id: "swimSpeed", valueText: "5")
+            ),
             codeFeature(.drones, title: "无限无人机", patchID: "drones", in: staticPatches),
             codeFeature(.stamina, title: "无限体力", patchID: "stamina", in: staticPatches),
             codeFeature(.wasabi, title: "无限芥末", patchID: "wasabi", in: staticPatches)
@@ -293,6 +298,14 @@ private enum DaveTrainerManifestFactory {
             return try DefaultStaticGamePatches.makeValuePatch(id: id, valueText: valueText)
         } catch {
             preconditionFailure("Invalid Dave value patch \(id): \(error.localizedDescription)")
+        }
+    }
+
+    private static func v106710ValuePatch(id: String, valueText: String) -> StaticGamePatch {
+        do {
+            return try DaveV106710StaticGamePatches.makeValuePatch(id: id, valueText: valueText)
+        } catch {
+            preconditionFailure("Invalid v1.0.6.710 value patch \(id): \(error.localizedDescription)")
         }
     }
 

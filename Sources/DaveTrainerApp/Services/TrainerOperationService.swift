@@ -56,10 +56,20 @@ protocol JungleIngredientsInventoryIncrementing {
 
 extension JungleIngredientsInventoryIncrementer: JungleIngredientsInventoryIncrementing {}
 
+typealias StaticValuePatchFactory = (_ id: String, _ valueText: String) throws -> StaticGamePatch
+
 final class TrainerOperationService {
     struct Configuration {
+        private struct LiveProfile {
+            let manifest: DaveTrainerManifest
+            let patches: [StaticGamePatch]
+            let valuePatchFactory: StaticValuePatchFactory
+            let unsupportedFeatureIDs: Set<DaveTrainerFeatureID>
+        }
+
         let manifest: DaveTrainerManifest
         let staticPatches: [String: StaticGamePatch]
+        let valuePatchFactory: StaticValuePatchFactory
         let applier: StaticPatchApplying
         let runtimeQuantityIncrementer: RuntimeQuantityIncrementing
         let ingredientsIncrementer: IngredientsInventoryIncrementing
@@ -68,37 +78,36 @@ final class TrainerOperationService {
 
         static func liveProfiles() -> [Configuration] {
             [
-                live(
+                live(LiveProfile(
                     manifest: .current,
                     patches: DefaultStaticGamePatches.make(),
+                    valuePatchFactory: DefaultStaticGamePatches.makeValuePatch(id:valueText:),
                     unsupportedFeatureIDs: []
-                ),
-                live(
+                )),
+                live(LiveProfile(
                     manifest: .v106710,
                     patches: DaveV106710StaticGamePatches.make(),
+                    valuePatchFactory: DaveV106710StaticGamePatches.makeValuePatch(id:valueText:),
                     unsupportedFeatureIDs: Set(DaveTrainerFeatureID.allCases).subtracting(
                         DaveTrainerManifest.v106710.features.map(\.id)
                     )
-                )
+                ))
             ]
         }
 
-        private static func live(
-            manifest: DaveTrainerManifest,
-            patches: [StaticGamePatch],
-            unsupportedFeatureIDs: Set<DaveTrainerFeatureID>
-        ) -> Configuration {
+        private static func live(_ profile: LiveProfile) -> Configuration {
             let moduleResolver = MachOModuleResolver(
-                expectedModuleIdentity: manifest.moduleIdentity(id: DaveTrainerManifest.gameAssemblyModuleID)
+                expectedModuleIdentity: profile.manifest.moduleIdentity(id: DaveTrainerManifest.gameAssemblyModuleID)
             )
             return Configuration(
-                manifest: manifest,
-                staticPatches: Dictionary(uniqueKeysWithValues: patches.map { ($0.id, $0) }),
+                manifest: profile.manifest,
+                staticPatches: Dictionary(uniqueKeysWithValues: profile.patches.map { ($0.id, $0) }),
+                valuePatchFactory: profile.valuePatchFactory,
                 applier: StaticPatchEngine(moduleResolver: moduleResolver),
                 runtimeQuantityIncrementer: RuntimeQuantityIncrementer(moduleResolver: moduleResolver),
                 ingredientsIncrementer: IngredientsInventoryIncrementer(moduleResolver: moduleResolver),
                 jungleIngredientsIncrementer: JungleIngredientsInventoryIncrementer(moduleResolver: moduleResolver),
-                intentionallyUnsupportedFeatureIDs: unsupportedFeatureIDs
+                intentionallyUnsupportedFeatureIDs: profile.unsupportedFeatureIDs
             )
         }
     }
@@ -225,6 +234,7 @@ private final class TrainerBuildOperationService {
     let intentionallyUnsupportedFeatureIDs: Set<DaveTrainerFeatureID>
 
     private let staticPatches: [String: StaticGamePatch]
+    private let valuePatchFactory: StaticValuePatchFactory
     private let applier: StaticPatchApplying
     private let runtimeQuantityIncrementer: RuntimeQuantityIncrementing
     private let ingredientsIncrementer: IngredientsInventoryIncrementing
@@ -236,6 +246,7 @@ private final class TrainerBuildOperationService {
         self.manifest = configuration.manifest
         self.intentionallyUnsupportedFeatureIDs = configuration.intentionallyUnsupportedFeatureIDs
         self.staticPatches = configuration.staticPatches
+        self.valuePatchFactory = configuration.valuePatchFactory
         self.applier = configuration.applier
         self.runtimeQuantityIncrementer = configuration.runtimeQuantityIncrementer
         self.ingredientsIncrementer = configuration.ingredientsIncrementer
@@ -407,7 +418,7 @@ private final class TrainerBuildOperationService {
     }
 
     private func enableValuePatch(_ operation: ValuePatchOperation) throws -> DaveTrainerOperationResult {
-        let patch = try DefaultStaticGamePatches.makeValuePatch(id: operation.patchID, valueText: operation.valueText)
+        let patch = try valuePatchFactory(operation.patchID, operation.valueText)
         do {
             try restoreConflictingValuePatches(for: operation.patchID, session: operation.context.session)
             if let previousPatch = activeValuePatches[operation.patchID], previousPatch != patch {
@@ -427,7 +438,8 @@ private final class TrainerBuildOperationService {
     }
 
     private func disableValuePatch(_ operation: ValuePatchOperation) throws -> DaveTrainerOperationResult {
-        let patch = try activeValuePatches[operation.patchID] ?? DefaultStaticGamePatches.makeValuePatch(id: operation.patchID, valueText: operation.valueText)
+        let patch = try activeValuePatches[operation.patchID]
+            ?? valuePatchFactory(operation.patchID, operation.valueText)
         do {
             try applier.apply(StaticPatchApplyRequest(patch: patch, isEnabled: false), session: operation.context.session)
             activeValuePatches[operation.patchID] = nil

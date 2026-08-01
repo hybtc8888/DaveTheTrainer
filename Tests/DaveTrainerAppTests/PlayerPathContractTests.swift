@@ -128,7 +128,7 @@ final class PlayerPathContractTests: XCTestCase {
 
         XCTAssertNil(store.unsupportedReason(for: god))
         XCTAssertTrue(store.unsupportedReason(for: damage)?.contains("v1.0.6.710.mac") == true)
-        XCTAssertTrue(store.logs.contains { $0.contains("已收录 8/22 个功能") })
+        XCTAssertTrue(store.logs.contains { $0.contains("已收录 9/22 个功能") })
     }
 
     private static var unsupportedInstall: GameInstall {

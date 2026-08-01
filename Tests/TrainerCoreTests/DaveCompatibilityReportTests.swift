@@ -19,7 +19,7 @@ final class DaveCompatibilityReportTests: XCTestCase {
         ))
 
         XCTAssertFalse(report.context.baseline.matchesDetectedBuild)
-        XCTAssertEqual(report.schemaVersion, "1.1")
+        XCTAssertEqual(report.schemaVersion, "1.2")
         XCTAssertEqual(report.context.detected.build.version, "v1.0.6.710.mac")
         XCTAssertEqual(report.patches.first?.evidence.observation.bytes, "AA BB CC DD EE FF 00 11")
         XCTAssertEqual(report.patches.first?.evidence.symbolDiscovery?.prefix, "_PlayerCharacter_SetHPDamage_m")
@@ -28,6 +28,9 @@ final class DaveCompatibilityReportTests: XCTestCase {
             report.patches.first?.evidence.symbolDiscovery?.candidates.first?.matchingExpectedRVAs,
             ["0xC0FFFE"]
         )
+        XCTAssertEqual(report.diagnostics.byteReads.map(\.id), ["damage.trampolineCodeCave"])
+        XCTAssertTrue(report.diagnostics.symbols.contains { $0.id == "damage.isEnemy" })
+        XCTAssertTrue(report.diagnostics.symbols.contains { $0.id == "runtime.saveSystemSingleton.instance" })
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -36,6 +39,30 @@ final class DaveCompatibilityReportTests: XCTestCase {
         XCTAssertFalse(json.contains("76561198000000000"))
         XCTAssertFalse(json.contains("_PlayerCharacter_SetHPDamage_mPRIVATEHASH"))
         XCTAssertTrue(json.contains("v1.0.6.710.mac"))
+    }
+
+    func testDamagePointUsesExplicitSymbolPrefixAndDeepWindow() throws {
+        let generator = DaveCompatibilityReportGenerator(
+            machOInspector: FakeCompatibilityMachOInspector(uuid: nil),
+            metadataAnalyzer: FakeCompatibilityMetadataAnalyzer(),
+            fileFingerprinter: FakeCompatibilityFileFingerprinter()
+        )
+
+        let report = try generator.generate(DaveCompatibilityReportRequest(
+            build: Self.reporterBuild(),
+            trainer: DaveTrainerReleaseIdentity(version: "0.1.5", build: "6", commit: "def456"),
+            profile: DaveCompatibilityProfile(manifest: .current, patches: [Self.damagePatch()])
+        ))
+
+        XCTAssertEqual(
+            report.patches.first?.evidence.symbolDiscovery?.prefix,
+            "_EffectResultHandler_DealDamage_m"
+        )
+        XCTAssertEqual(
+            report.patches.first?.evidence.symbolDiscovery?.candidates.first?.observation.bytes?
+                .split(separator: " ").count,
+            3072
+        )
     }
 
     func testRelocatedBaselineMatchesProfileIdentityAndModuleUUID() throws {
@@ -87,6 +114,22 @@ final class DaveCompatibilityReportTests: XCTestCase {
                     expectedBytes: [0xFF, 0xC3, 0x01, 0xD1, 0xEB, 0x2B, 0x02, 0x6D],
                     patchBytes: [0xC0, 0x03, 0x5F, 0xD6],
                     note: "PlayerCharacter_SetHPDamage -> ret"
+                )
+            ]
+        )
+    }
+
+    private static func damagePatch() -> StaticGamePatch {
+        StaticGamePatch(
+            id: "damage",
+            title: "Damage",
+            points: [
+                StaticPatchPoint(
+                    rva: 0x18DD_D70,
+                    expectedBytes: [0xF3, 0x03, 0x01, 0xAA],
+                    patchBytes: [0xC0, 0x03, 0x5F, 0xD6],
+                    note: "RPG DealDamage target Enemy -> super damage",
+                    targetID: "damage.23"
                 )
             ]
         )

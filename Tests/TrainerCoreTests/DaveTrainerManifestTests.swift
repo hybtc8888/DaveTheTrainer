@@ -34,13 +34,14 @@ final class DaveTrainerManifestTests: XCTestCase {
             .ammo,
             .crabTraps,
             .weight,
+            .swimSpeed,
             .drones,
             .stamina,
             .wasabi
         ])
         XCTAssertNil(manifest.feature(id: .divingGod))
         XCTAssertNil(manifest.feature(id: .damage))
-        XCTAssertNil(manifest.feature(id: .swimSpeed))
+        XCTAssertNotNil(manifest.feature(id: .swimSpeed))
         XCTAssertNil(manifest.feature(id: .gold))
     }
 
@@ -52,7 +53,7 @@ final class DaveTrainerManifestTests: XCTestCase {
         })
 
         XCTAssertEqual(patches.count, 8)
-        XCTAssertEqual(points.count, 59)
+        XCTAssertEqual(points.count, 66)
         XCTAssertEqual(pointsByID.count, points.count)
         XCTAssertEqual(pointsByID["god.0"]?.rva, 0x0B85_378)
         XCTAssertEqual(pointsByID["ammo.5"]?.rva, 0x1B4E_A30)
@@ -60,6 +61,24 @@ final class DaveTrainerManifestTests: XCTestCase {
         XCTAssertEqual(pointsByID["wasabi.0"]?.rva, 0x2152_C68)
         XCTAssertTrue(points.allSatisfy { $0.trampoline == nil })
         XCTAssertTrue(points.allSatisfy { $0.patchBytes.count <= $0.expectedBytes.count })
+    }
+
+    func testV106710SpeedPatchUsesOnlyRelocatableReportVerifiedPoints() throws {
+        let patch = try DaveV106710StaticGamePatches.makeValuePatch(
+            id: "swimSpeed",
+            valueText: "7"
+        )
+
+        XCTAssertEqual(patch.points.compactMap(\.targetID), [
+            "swimSpeed.0",
+            "swimSpeed.1",
+            "swimSpeed.2",
+            "swimSpeed.4",
+            "swimSpeed.9",
+            "swimSpeed.10"
+        ])
+        XCTAssertTrue(patch.points.allSatisfy { $0.trampoline == nil })
+        XCTAssertTrue(patch.points.allSatisfy { $0.patchBytes.count <= $0.expectedBytes.count })
     }
 
     func testCurrentManifestDeclaresGameAssemblyModuleIdentity() throws {

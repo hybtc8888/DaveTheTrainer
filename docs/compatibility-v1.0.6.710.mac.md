@@ -1,7 +1,7 @@
 # v1.0.6.710.mac Compatibility Evidence
 
-This profile was derived from the v0.1.3 compatibility report attached to
-[GitHub issue #2](https://github.com/Empress7211/DaveTheTrainer/issues/2#issuecomment-5115490874).
+This profile was derived from the v0.1.3 and v0.1.4 compatibility reports attached to
+[GitHub issue #2](https://github.com/Empress7211/DaveTheTrainer/issues/2#issuecomment-5126767138).
 It is a reviewed partial profile, not a claim that every trainer feature is
 portable to this game build.
 
@@ -19,21 +19,23 @@ portable to this game build.
 
 ## Reviewed Coverage
 
-The report contained 97 baseline patch points. The `.710` profile includes 59
-points for which the report supplied exact target evidence:
+The latest report contained 135 baseline and representative value-patch points.
+The `.710` profile includes 72 points for which the reports supplied exact target
+evidence:
 
 | Feature | Included points | Baseline points | Notes |
 | --- | ---: | ---: | --- |
 | God mode | 7 | 10 | Core player and breath-handler methods; insect battle and RPG internals remain excluded |
 | Oxygen | 4 | 4 | Complete reported group |
-| Ammo | 16 | 21 | Public/core methods only; unlocated internal gates remain excluded |
+| Ammo | 21 | 21 | Complete reported group |
 | Crab traps | 7 | 7 | Complete reported group |
 | Weight | 14 | 14 | Complete reported group |
-| Drones | 3 | 4 | Internal UI count point remains excluded |
-| Stamina | 3 | 4 | Internal drain arithmetic point remains excluded |
+| Player speed | 6 | 13 | Main, fish-farm, and Bacon Story methods with position-independent patch bytes; unmatched internal branch/literal points remain excluded |
+| Drones | 4 | 4 | Complete reported group |
+| Stamina | 4 | 4 | Complete reported group |
 | Wasabi | 5 | 5 | Complete reported group |
 
-No target was relocated using a global offset. Fifty-seven targets contain the
+No target was relocated using a global offset. Seventy targets contain the
 baseline expected byte sequence at the reported method-symbol candidate RVA.
 Two reviewed exceptions are explicit:
 
@@ -56,6 +58,8 @@ gameplay path. The app reports `bytesApplied` after readback; it does not report
 `behaviorVerified` for these code patches.
 
 All other `.710` features remain disabled until a report provides enough exact
-evidence. Compatibility report schema 1.1 expands symbol samples and emits exact
-candidate matches so later reports can cover those targets without adding
-runtime scanning or guessed writes to the player path.
+evidence. Compatibility report schema 1.2 reads 3072-byte method windows, maps
+damage targets to explicit method prefixes, records the RPG trampoline code cave,
+and captures resource helper/singleton candidates. These diagnostics are intended
+to cover later targets without adding runtime scanning or guessed writes to the
+player path.

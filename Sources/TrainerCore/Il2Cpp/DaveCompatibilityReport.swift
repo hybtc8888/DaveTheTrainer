@@ -1,10 +1,12 @@
 import CryptoKit
 import Foundation
 
-private let compatibilityReportSchemaVersion = "1.1"
-private let compatibilitySymbolByteCount = 1024
+private let compatibilityReportSchemaVersion = "1.2"
+private let compatibilitySymbolByteCount = 3072
 private let fileHashChunkByteCount = 1024 * 1024
 private let gameAssemblyRelativePath = "Frameworks/GameAssembly.dylib"
+private let rpgDamageTrampolineCodeCaveRVA = UInt64(0x940)
+private let rpgDamageTrampolineCodeCaveByteCount = 72
 
 public struct DaveTrainerReleaseIdentity: Codable, Equatable, Sendable {
     public let version: String
@@ -146,10 +148,27 @@ public struct DaveCompatibilityPatchEvidence: Codable, Equatable, Sendable {
     public let evidence: DaveCompatibilityPatchPointEvidence
 }
 
+public struct DaveCompatibilityDiagnosticByteEvidence: Codable, Equatable, Sendable {
+    public let id: String
+    public let baseline: DaveCompatibilityBaselineBytes
+    public let observation: DaveCompatibilityObservedBytes
+}
+
+public struct DaveCompatibilityDiagnosticSymbolEvidence: Codable, Equatable, Sendable {
+    public let id: String
+    public let discovery: DaveCompatibilitySymbolDiscovery
+}
+
+public struct DaveCompatibilityDiagnostics: Codable, Equatable, Sendable {
+    public let byteReads: [DaveCompatibilityDiagnosticByteEvidence]
+    public let symbols: [DaveCompatibilityDiagnosticSymbolEvidence]
+}
+
 public struct DaveCompatibilityReport: Codable, Equatable, Sendable {
     public let schemaVersion: String
     public let context: DaveCompatibilityReportContext
     public let patches: [DaveCompatibilityPatchEvidence]
+    public let diagnostics: DaveCompatibilityDiagnostics
 }
 
 public protocol DaveCompatibilityReportGenerating: Sendable {
@@ -192,7 +211,93 @@ struct SHA256FileFingerprinter: CompatibilityFileFingerprinting {
     }
 }
 
+private struct CompatibilityDiagnosticByteDescriptor {
+    let id: String
+    let rva: UInt64
+    let expectedBytes: [UInt8]
+}
+
+private struct CompatibilityDiagnosticSymbolDescriptor {
+    let id: String
+    let prefix: String
+}
+
 public final class DaveCompatibilityReportGenerator: DaveCompatibilityReportGenerating, @unchecked Sendable {
+    private static let diagnosticByteDescriptors = [
+        CompatibilityDiagnosticByteDescriptor(
+            id: "damage.trampolineCodeCave",
+            rva: rpgDamageTrampolineCodeCaveRVA,
+            expectedBytes: Array(repeating: 0, count: rpgDamageTrampolineCodeCaveByteCount)
+        )
+    ]
+
+    private static let diagnosticSymbolDescriptors = [
+        CompatibilityDiagnosticSymbolDescriptor(id: "damage.isEnemy", prefix: "_BattleUtils_IsEnemy_m"),
+        CompatibilityDiagnosticSymbolDescriptor(id: "obscuredInt.fromInt", prefix: "_ObscuredInt_op_Implicit_m"),
+        CompatibilityDiagnosticSymbolDescriptor(id: "saveSystem.getGameSave", prefix: "_SaveSystem_GetGameSave_m"),
+        CompatibilityDiagnosticSymbolDescriptor(id: "saveData.updatePlayerSave", prefix: "_SaveData_UpdatePlayerSave_m"),
+        CompatibilityDiagnosticSymbolDescriptor(
+            id: "runtime.raiseNullReference",
+            prefix: "__Z45il2cpp_codegen_raise_null_reference_exceptionv"
+        ),
+        CompatibilityDiagnosticSymbolDescriptor(
+            id: "runtime.raiseIndexOutOfRange",
+            prefix: "__Z49il2cpp_codegen_raise_index_out_of_range_exceptionv"
+        ),
+        CompatibilityDiagnosticSymbolDescriptor(
+            id: "runtime.saveSystemSingleton.instance",
+            prefix: "_Singleton_1_get_Instance_mFC618E338A7B241D0CF1919A12AC4B3F787E7381_RuntimeMethod_var"
+        ),
+        CompatibilityDiagnosticSymbolDescriptor(
+            id: "runtime.saveSystemSingleton.hasInstance",
+            prefix: "_Singleton_1_get_hasInstance_mB2D77CCC1A8BF769F8D14738F0969975E8176A55_RuntimeMethod_var"
+        ),
+        CompatibilityDiagnosticSymbolDescriptor(
+            id: "runtime.ingredientsStorageSingleton.instance",
+            prefix: "_SingletonNoMono_1_get_Instance_mF29D3D880C6EC42811EE9C6ABBF1F545C4001E79_RuntimeMethod_var"
+        ),
+        CompatibilityDiagnosticSymbolDescriptor(
+            id: "runtime.ingredientsStorageSingleton.constructor",
+            prefix: "_SingletonNoMono_1__ctor_m519D29DCFD59A6704139CD3245D7124E144CAB1F_RuntimeMethod_var"
+        )
+    ]
+
+    private static let symbolPrefixOverrides = [
+        "god.7": "_InCombatStateController_CalculateCombatResult_m",
+        "god.8": "_InCombatStateController_CalculateCombatResult_m",
+        "god.9": "_EffectResultHandler_DealDamage_m",
+        "damage.0": "_HarpoonProjectile_get_BuffedProjectileDamage_m",
+        "damage.1": "_HarpoonProjectile_get_ProjectileDamage_m",
+        "damage.2": "_HarpoonProjectile_get_GlobalProjectileDamage_m",
+        "damage.3": "_HarpoonProjectile_CollisionDetection_m",
+        "damage.4": "_PirateRopeChainController_OnTakeRopeDamage_m",
+        "damage.5": "_PirateRopeChainController_OnTakeRopeDamage_m",
+        "damage.6": "_NPCPlayer_JohnWatson_OnTakeDamage_m",
+        "damage.7": "_WreckController_OnTakeDamage_m",
+        "damage.8": "_FishAISystem_OnTakeDamage_m",
+        "damage.9": "_NPC_Mxmtoon_OnTakeDamage_m",
+        "damage.10": "_NPCPlayer_PirateBase_OnTakeDamage_m",
+        "damage.11": "_NPCPlayer_PirateBase_OnTakeDamage_m",
+        "damage.12": "_NPCPlayerCharacter_OnTakeDamage_m",
+        "damage.13": "_Damageable_TakeDamage_m",
+        "damage.14": "_Damageable_TakeDamage_m",
+        "damage.15": "_RockBlocker_TakeDamageBefore_m",
+        "damage.16": "_BossGiantSquidController_OnTakeDamage_m",
+        "damage.17": "_BossWolffishController_OnTakeDamage_m",
+        "damage.18": "_BossWolffishController_OnTakeDamage_m",
+        "damage.19": "_BossWolffishController_OnTakeDamage_m",
+        "damage.20": "_InCombatStateController_CalculateCombatResult_m",
+        "damage.21": "_InCombatStateController_CalculateCombatResult_m",
+        "damage.22": "_InCombatStateController_CalculateCombatResult_m",
+        "damage.23": "_EffectResultHandler_DealDamage_m",
+        "damage.24": "_AttackData_get_BuffedDamage_m",
+        "damage.25": "_Damager_SetDamageValue_m",
+        "damage.26": "_ExtensionIDamager_GetBuffedDamage_m",
+        "damage.27": "_U3CHandleResultU3Ed__13_MoveNext_m",
+        "swimSpeed.11": "_ChangeSwimSpeed_OnSLStateEnter_m",
+        "swimSpeed.12": "_ChangeSwimSpeed_OnSLStateNoTransitionUpdate_m"
+    ]
+
     private let machOInspector: CompatibilityMachOInspecting
     private let metadataAnalyzer: CompatibilityMetadataAnalyzing
     private let fileFingerprinter: CompatibilityFileFingerprinting
@@ -242,7 +347,8 @@ public final class DaveCompatibilityReportGenerator: DaveCompatibilityReportGene
         return DaveCompatibilityReport(
             schemaVersion: compatibilityReportSchemaVersion,
             context: context,
-            patches: Self.patchEvidence(descriptors: descriptors, inspection: inspection)
+            patches: Self.patchEvidence(descriptors: descriptors, inspection: inspection),
+            diagnostics: Self.diagnosticEvidence(inspection: inspection)
         )
     }
 
@@ -276,17 +382,25 @@ public final class DaveCompatibilityReportGenerator: DaveCompatibilityReportGene
     private static func inspectionRequest(
         for descriptors: [CompatibilityPatchPointDescriptor]
     ) -> MachOBinaryInspectionRequest {
-        let prefixes = Set(descriptors.compactMap(\.symbolPrefix))
-        let reads = descriptors.map { descriptor in
+        let patchPrefixes = descriptors.compactMap(\.symbolPrefix)
+        let diagnosticPrefixes = diagnosticSymbolDescriptors.map(\.prefix)
+        let patchReads = descriptors.map { descriptor in
             MachOByteReadRequest(
                 id: descriptor.pointID,
                 rva: descriptor.point.rva,
                 count: descriptor.point.expectedBytes.count
             )
         }
+        let diagnosticReads = diagnosticByteDescriptors.map { descriptor in
+            MachOByteReadRequest(
+                id: descriptor.id,
+                rva: descriptor.rva,
+                count: descriptor.expectedBytes.count
+            )
+        }
         return MachOBinaryInspectionRequest(
-            symbolPrefixes: prefixes,
-            byteReads: reads,
+            symbolPrefixes: Set(patchPrefixes + diagnosticPrefixes),
+            byteReads: patchReads + diagnosticReads,
             symbolByteCount: compatibilitySymbolByteCount
         )
     }
@@ -296,17 +410,21 @@ public final class DaveCompatibilityReportGenerator: DaveCompatibilityReportGene
     ) -> [CompatibilityPatchPointDescriptor] {
         patches.flatMap { patch in
             patch.points.enumerated().map { index, point in
-                CompatibilityPatchPointDescriptor(
+                let pointID = point.resolvedTargetID(patchID: patch.id, fallbackIndex: index)
+                return CompatibilityPatchPointDescriptor(
                     patchID: patch.id,
-                    pointID: point.resolvedTargetID(patchID: patch.id, fallbackIndex: index),
+                    pointID: pointID,
                     point: point,
-                    symbolPrefix: symbolPrefix(for: point.note)
+                    symbolPrefix: symbolPrefix(pointID: pointID, note: point.note)
                 )
             }
         }
     }
 
-    private static func symbolPrefix(for note: String) -> String? {
+    private static func symbolPrefix(pointID: String, note: String) -> String? {
+        if let prefix = symbolPrefixOverrides[pointID] {
+            return prefix
+        }
         guard let token = note.split(separator: " ").first else {
             return nil
         }
@@ -353,6 +471,35 @@ public final class DaveCompatibilityReportGenerator: DaveCompatibilityReportGene
                 evidence: pointEvidence
             )
         }
+    }
+
+    private static func diagnosticEvidence(
+        inspection: MachOBinaryInspection
+    ) -> DaveCompatibilityDiagnostics {
+        let reads = Dictionary(
+            uniqueKeysWithValues: inspection.byteReads.map { ($0.request.id, $0.result) }
+        )
+        let byteEvidence = diagnosticByteDescriptors.map { descriptor in
+            DaveCompatibilityDiagnosticByteEvidence(
+                id: descriptor.id,
+                baseline: DaveCompatibilityBaselineBytes(
+                    rva: hexRVA(descriptor.rva),
+                    expected: hexBytes(descriptor.expectedBytes)
+                ),
+                observation: observedBytes(reads[descriptor.id])
+            )
+        }
+        let symbolEvidence = diagnosticSymbolDescriptors.map { descriptor in
+            DaveCompatibilityDiagnosticSymbolEvidence(
+                id: descriptor.id,
+                discovery: symbolDiscovery(
+                    prefix: descriptor.prefix,
+                    expectedBytes: [],
+                    inspection: inspection
+                )
+            )
+        }
+        return DaveCompatibilityDiagnostics(byteReads: byteEvidence, symbols: symbolEvidence)
     }
 
     private static func symbolDiscovery(

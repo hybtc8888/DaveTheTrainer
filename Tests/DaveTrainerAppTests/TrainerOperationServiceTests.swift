@@ -66,6 +66,32 @@ final class TrainerOperationServiceTests: XCTestCase {
         XCTAssertTrue(applier.requests.isEmpty)
     }
 
+    func testV106710ValuePatchUsesRelocatedSpeedTargets() throws {
+        let applier = RecordingTrainerOperationApplier()
+        let service = TrainerOperationService(configuration: .v106710(applier: applier))
+
+        let result = try service.apply(
+            TrainerOperationRequest(
+                featureID: .swimSpeed,
+                isEnabled: true,
+                payload: .valuePatch(patchID: "swimSpeed", valueText: "7")
+            ),
+            context: TrainerOperationContext(session: Self.session(), gameBuild: KnownGameBuild.v106710)
+        )
+
+        XCTAssertEqual(result.state, .bytesApplied)
+        XCTAssertEqual(result.targetIDs, ["swimSpeed"])
+        XCTAssertEqual(applier.requests.count, 1)
+        XCTAssertEqual(applier.requests[0].patch.points.map(\.rva), [
+            0x20A4_8AC,
+            0x0B80_8D0,
+            0x100B_AF4,
+            0x0F64_794,
+            0x1152_180,
+            0x115B_59C
+        ])
+    }
+
     func testKnownPartialProfileCanPrepareBeforeSelectingAFeature() {
         let service = TrainerOperationService(configuration: .v106710(
             applier: RecordingTrainerOperationApplier()
@@ -437,6 +463,7 @@ private extension TrainerOperationService.Configuration {
         TrainerOperationService.Configuration(
             manifest: manifest,
             staticPatches: TrainerOperationServiceTests.testPatches,
+            valuePatchFactory: DefaultStaticGamePatches.makeValuePatch(id:valueText:),
             applier: applier,
             runtimeQuantityIncrementer: runtimeQuantityIncrementer,
             ingredientsIncrementer: ingredientsIncrementer,
@@ -452,6 +479,7 @@ private extension TrainerOperationService.Configuration {
             staticPatches: Dictionary(
                 uniqueKeysWithValues: DaveV106710StaticGamePatches.make().map { ($0.id, $0) }
             ),
+            valuePatchFactory: DaveV106710StaticGamePatches.makeValuePatch(id:valueText:),
             applier: applier,
             runtimeQuantityIncrementer: RecordingRuntimeQuantityIncrementer(),
             ingredientsIncrementer: RecordingIngredientsInventoryIncrementer(),

@@ -24,8 +24,8 @@ public enum DaveV106710StaticGamePatches {
         "wasabi"
     ]
 
-    // Curated from the v0.1.3 compatibility report attached to GitHub issue #2.
-    private static let verifiedPoints = [
+    // Curated from the v0.1.3 and v0.1.4 compatibility reports attached to GitHub issue #2.
+    private static let staticVerifiedPoints = [
         VerifiedPoint(targetID: "god.0", rva: 0x0B85_378),
         VerifiedPoint(targetID: "god.1", rva: 0x0B85_604),
         VerifiedPoint(targetID: "god.2", rva: 0x0B81_C68),
@@ -41,12 +41,17 @@ public enum DaveV106710StaticGamePatches {
         VerifiedPoint(targetID: "ammo.1", rva: 0x0B87_F70),
         VerifiedPoint(targetID: "ammo.2", rva: 0x1B5B_D78),
         VerifiedPoint(targetID: "ammo.3", rva: 0x1B5B_E40),
+        VerifiedPoint(targetID: "ammo.4", rva: 0x1B4F_5CC),
         VerifiedPoint(targetID: "ammo.5", rva: 0x1B4E_A30),
         VerifiedPoint(targetID: "ammo.6", rva: 0x1B4F_370),
         VerifiedPoint(targetID: "ammo.7", rva: 0x1B4F_E24),
+        VerifiedPoint(targetID: "ammo.8", rva: 0x1B4E_F38),
+        VerifiedPoint(targetID: "ammo.9", rva: 0x1B4E_FB4),
         VerifiedPoint(targetID: "ammo.10", rva: 0x13C0_9B8),
         VerifiedPoint(targetID: "ammo.11", rva: 0x13C0_3D4),
         VerifiedPoint(targetID: "ammo.12", rva: 0x13C0_474),
+        VerifiedPoint(targetID: "ammo.13", rva: 0x1355_968),
+        VerifiedPoint(targetID: "ammo.14", rva: 0x1D32_F10),
         VerifiedPoint(targetID: "ammo.15", rva: 0x13CE_B0C),
         VerifiedPoint(targetID: "ammo.16", rva: 0x13D4_5AC),
         VerifiedPoint(targetID: "ammo.17", rva: 0x13D4_660),
@@ -84,11 +89,13 @@ public enum DaveV106710StaticGamePatches {
             ]
         ),
         VerifiedPoint(targetID: "drones.0", rva: 0x0B7A_120),
+        VerifiedPoint(targetID: "drones.1", rva: 0x1D33_6E4),
         VerifiedPoint(targetID: "drones.2", rva: 0x0B7A_128),
         VerifiedPoint(targetID: "drones.3", rva: 0x0B7A_130),
         VerifiedPoint(targetID: "stamina.0", rva: 0x100B_AE4),
         VerifiedPoint(targetID: "stamina.1", rva: 0x100B_AEC),
         VerifiedPoint(targetID: "stamina.2", rva: 0x100B_7A8),
+        VerifiedPoint(targetID: "stamina.3", rva: 0x100B_E3C),
         VerifiedPoint(
             targetID: "wasabi.0",
             rva: 0x2152_C68,
@@ -109,11 +116,20 @@ public enum DaveV106710StaticGamePatches {
         VerifiedPoint(targetID: "wasabi.4", rva: 0x2152_AC4)
     ]
 
+    private static let swimSpeedVerifiedPoints = [
+        VerifiedPoint(targetID: "swimSpeed.0", rva: 0x20A4_8AC),
+        VerifiedPoint(targetID: "swimSpeed.1", rva: 0x0B80_8D0),
+        VerifiedPoint(targetID: "swimSpeed.2", rva: 0x100B_AF4),
+        VerifiedPoint(targetID: "swimSpeed.4", rva: 0x0F64_794),
+        VerifiedPoint(targetID: "swimSpeed.9", rva: 0x1152_180),
+        VerifiedPoint(targetID: "swimSpeed.10", rva: 0x115B_59C)
+    ]
+
     public static func make() -> [StaticGamePatch] {
         let baselinePatches = Dictionary(
             uniqueKeysWithValues: DefaultStaticGamePatches.make().map { ($0.id, $0) }
         )
-        let evidenceByID = Dictionary(uniqueKeysWithValues: verifiedPoints.map { ($0.targetID, $0) })
+        let evidenceByID = Dictionary(uniqueKeysWithValues: staticVerifiedPoints.map { ($0.targetID, $0) })
         let patches = supportedPatchIDs.map { patchID in
             guard let baseline = baselinePatches[patchID] else {
                 preconditionFailure("Missing baseline patch: \(patchID)")
@@ -123,6 +139,19 @@ public enum DaveV106710StaticGamePatches {
         let pointCount = patches.reduce(0) { $0 + $1.points.count }
         precondition(pointCount == evidenceByID.count, "Unconsumed v1.0.6.710 patch evidence")
         return patches
+    }
+
+    public static func makeValuePatch(id: String, valueText: String) throws -> StaticGamePatch {
+        guard id == "swimSpeed" else {
+            throw TrainerError.invalidInput("v1.0.6.710 尚未验证固定数值 patch：\(id)")
+        }
+        let baseline = try DefaultStaticGamePatches.makeValuePatch(id: id, valueText: valueText)
+        let evidenceByID = Dictionary(
+            uniqueKeysWithValues: swimSpeedVerifiedPoints.map { ($0.targetID, $0) }
+        )
+        let patch = relocatedPatch(baseline, evidenceByID: evidenceByID)
+        precondition(patch.points.count == evidenceByID.count, "Unconsumed v1.0.6.710 value patch evidence")
+        return patch
     }
 
     private static func relocatedPatch(

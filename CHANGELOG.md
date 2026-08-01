@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## v0.1.5 - 2026-08-02
+
+- Expand the exact `v1.0.6.710.mac` profile from 59 to 72 byte-verified targets across nine features.
+- Add a partial `.710` player-speed patch with six position-independent targets found in the reporter's v0.1.4 compatibility report.
+- Complete the reported ammo, drone, and stamina target groups with five additional ammo points, the drone UI count point, and the stamina-drain point.
+- Inject value-patch factories per game build so `.710` speed changes cannot accidentally reuse `.675` RVAs.
+- Expand compatibility report schema `1.2` to use 3072-byte symbol windows, explicit damage-method mappings, RPG trampoline code-cave evidence, and resource helper/singleton diagnostics.
+- Keep damage and runtime currency/inventory controls disabled on `.710` where the report does not yet prove the complete write path.
+
 ## v0.1.4 - 2026-07-30
 
 - Add an exact, report-derived partial profile for `v1.0.6.710.mac`, bound to its build GUID and GameAssembly arm64 UUID.

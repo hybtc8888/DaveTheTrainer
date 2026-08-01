@@ -46,7 +46,7 @@ Mach-O 模块形态、确定的补丁点或运行时对象路径。安装路径�
 
 安装步骤：
 
-1. 从最新 Release 下载 `DaveTheTrainer-v0.1.4-macOS.zip`。
+1. 从最新 Release 下载 `DaveTheTrainer-v0.1.5-macOS.zip`。
 2. 解压 zip。
 3. 把 `DaveTheTrainer.app` 移动到 `/Applications` 或 `$HOME/Applications`。
 4. 启动 macOS 版 `DAVE THE DIVER`。
@@ -67,7 +67,7 @@ xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
 | 游戏构建 | 覆盖范围 |
 | --- | --- |
 | `v1.0.6.675.mac` | 完整基线 profile |
-| `v1.0.6.710.mac` | 无敌、氧气、弹药、鱼笼、负重、无人机、体力和芥末的精确目标；其他控件禁用 |
+| `v1.0.6.710.mac` | 72 个精确目标，覆盖无敌、氧气、弹药、鱼笼、负重、部分移动速度、无人机、体力和芥末；其他控件禁用 |
 
 `.710` 目标已与用户报告中的 GameAssembly 字节证据逐点核对，并绑定其精确 UUID。
 由于维护者本机没有该版本，尚未完成实际游戏行为验证。请逐项测试已启用功能，不要把
@@ -135,7 +135,7 @@ swift test
 `script/build_and_run.sh` 会构建 SwiftPM executable，生成真实的
 `DaveTheTrainer.app` bundle，签名，复制到
 `${DAVE_TRAINER_LOCAL_APP_DIR:-$HOME/Applications}`，同时在 `dist/` 下生成
-`DaveTheTrainer-v0.1.4-macOS.zip`。
+`DaveTheTrainer-v0.1.5-macOS.zip`。
 
 GitHub Actions 运行公开测试套件，并跳过需要本机游戏安装或专有游戏文件的测试：
 
