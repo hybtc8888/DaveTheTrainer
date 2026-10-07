@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add an exact partial profile for `v1.0.6.756.mac`, bound to its build GUID and arm64 GameAssembly UUID.
+- Independently relocate and byte-verify 72 targets across nine feature groups; keep unverified damage, combined mode, currency, inventory, and artisan controls disabled.
+- Add build-routing and rejection tests plus an optional read-only local binary check. Gameplay effects remain unverified.
+
+## Unreleased
+
 ## v0.1.5 - 2026-08-02
 
 - Expand the exact `v1.0.6.710.mac` profile from 59 to 72 byte-verified targets across nine features.

@@ -17,7 +17,8 @@ DaveTheTrainer 是一个原生 macOS SwiftUI 修改器。它不是通用内存�
 Cheat Engine 风格工具。玩家按钮都绑定到已审查的 manifest feature、已验证的
 Mach-O 模块形态、确定的补丁点或运行时对象路径。安装路径可以变化，但玩家内存写入
 必须匹配经过审核的精确构建 profile。`v1.0.6.675.mac` 是完整验证的 profile，
-`v1.0.6.710.mac` 是根据 issue #2 报告建立的部分兼容 profile。
+`v1.0.6.710.mac` 是根据 issue #2 报告建立的部分兼容 profile，
+`v1.0.6.756.mac` 是根据本地二进制逐点核对建立的部分兼容 profile。
 
 > 本项目与 MINTROCKET、Nexon 或 `DAVE THE DIVER` 创作者没有隶属、赞助、
 > 背书或官方合作关系。
@@ -30,7 +31,7 @@ Mach-O 模块形态、确定的补丁点或运行时对象路径。安装路径�
 | 应用类型 | 原生 SwiftUI app |
 | 包管理 | Swift Package Manager |
 | 已验证基线版本 | `v1.0.6.675.mac` |
-| 报告证据支持的部分版本 | `v1.0.6.710.mac` |
+| 证据支持的部分版本 | `v1.0.6.710.mac`、`v1.0.6.756.mac` |
 | 目标模块 | `GameAssembly.dylib` |
 | Manifest schema | `1.0` |
 | 测试 | 覆盖 manifest 策略、事务补丁、运行时增量、发布脚本和玩家路径契约 |
@@ -68,10 +69,14 @@ xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
 | --- | --- |
 | `v1.0.6.675.mac` | 完整基线 profile |
 | `v1.0.6.710.mac` | 72 个精确目标，覆盖无敌、氧气、弹药、鱼笼、负重、部分移动速度、无人机、体力和芥末；其他控件禁用 |
+| `v1.0.6.756.mac` | 72 个精确目标，覆盖无敌、氧气、弹药、鱼笼、负重、部分移动速度、无人机、体力和芥末；其他控件禁用 |
 
 `.710` 目标已与用户报告中的 GameAssembly 字节证据逐点核对，并绑定其精确 UUID。
 由于维护者本机没有该版本，尚未完成实际游戏行为验证。请逐项测试已启用功能，不要把
 `bytesApplied` 等同于游戏内效果已确认。详见 [兼容证据说明](docs/compatibility-v1.0.6.710.mac.md)。
+
+`.756` 已在本地 arm64 二进制上核对全部 72 个目标窗口，尚未确认游戏内实际效果。
+详见 [v1.0.6.756.mac 兼容证据](docs/compatibility-v1.0.6.756.mac.md)。
 
 玩家内存写入必须精确匹配 manifest 中的 bundle ID、版本、build GUID 和 GameAssembly
 arm64 UUID。未知构建仍可被识别并用于诊断，但会在读取或修改旧 RVA 前拒绝玩家写入。

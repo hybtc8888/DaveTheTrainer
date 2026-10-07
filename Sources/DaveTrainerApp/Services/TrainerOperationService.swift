@@ -91,6 +91,14 @@ final class TrainerOperationService {
                     unsupportedFeatureIDs: Set(DaveTrainerFeatureID.allCases).subtracting(
                         DaveTrainerManifest.v106710.features.map(\.id)
                     )
+                )),
+                live(LiveProfile(
+                    manifest: .v106756,
+                    patches: DaveV106756StaticGamePatches.make(),
+                    valuePatchFactory: DaveV106756StaticGamePatches.makeValuePatch(id:valueText:),
+                    unsupportedFeatureIDs: Set(DaveTrainerFeatureID.allCases).subtracting(
+                        DaveTrainerManifest.v106756.features.map(\.id)
+                    )
                 ))
             ]
         }
