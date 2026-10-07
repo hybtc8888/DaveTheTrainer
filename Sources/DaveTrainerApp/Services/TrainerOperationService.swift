@@ -64,6 +64,7 @@ final class TrainerOperationService {
             let manifest: DaveTrainerManifest
             let patches: [StaticGamePatch]
             let valuePatchFactory: StaticValuePatchFactory
+            let runtimeLayout: DaveRuntimeLayout
             let unsupportedFeatureIDs: Set<DaveTrainerFeatureID>
         }
 
@@ -82,12 +83,14 @@ final class TrainerOperationService {
                     manifest: .current,
                     patches: DefaultStaticGamePatches.make(),
                     valuePatchFactory: DefaultStaticGamePatches.makeValuePatch(id:valueText:),
+                    runtimeLayout: .v106675,
                     unsupportedFeatureIDs: []
                 )),
                 live(LiveProfile(
                     manifest: .v106710,
                     patches: DaveV106710StaticGamePatches.make(),
                     valuePatchFactory: DaveV106710StaticGamePatches.makeValuePatch(id:valueText:),
+                    runtimeLayout: .v106675,
                     unsupportedFeatureIDs: Set(DaveTrainerFeatureID.allCases).subtracting(
                         DaveTrainerManifest.v106710.features.map(\.id)
                     )
@@ -96,6 +99,7 @@ final class TrainerOperationService {
                     manifest: .v106756,
                     patches: DaveV106756StaticGamePatches.make(),
                     valuePatchFactory: DaveV106756StaticGamePatches.makeValuePatch(id:valueText:),
+                    runtimeLayout: .v106756,
                     unsupportedFeatureIDs: Set(DaveTrainerFeatureID.allCases).subtracting(
                         DaveTrainerManifest.v106756.features.map(\.id)
                     )
@@ -112,9 +116,9 @@ final class TrainerOperationService {
                 staticPatches: Dictionary(uniqueKeysWithValues: profile.patches.map { ($0.id, $0) }),
                 valuePatchFactory: profile.valuePatchFactory,
                 applier: StaticPatchEngine(moduleResolver: moduleResolver),
-                runtimeQuantityIncrementer: RuntimeQuantityIncrementer(moduleResolver: moduleResolver),
-                ingredientsIncrementer: IngredientsInventoryIncrementer(moduleResolver: moduleResolver),
-                jungleIngredientsIncrementer: JungleIngredientsInventoryIncrementer(moduleResolver: moduleResolver),
+                runtimeQuantityIncrementer: RuntimeQuantityIncrementer(moduleResolver: moduleResolver, layout: profile.runtimeLayout),
+                ingredientsIncrementer: IngredientsInventoryIncrementer(moduleResolver: moduleResolver, layout: profile.runtimeLayout),
+                jungleIngredientsIncrementer: JungleIngredientsInventoryIncrementer(moduleResolver: moduleResolver, layout: profile.runtimeLayout),
                 intentionallyUnsupportedFeatureIDs: profile.unsupportedFeatureIDs
             )
         }

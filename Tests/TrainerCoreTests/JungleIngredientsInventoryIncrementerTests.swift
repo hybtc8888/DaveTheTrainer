@@ -2,6 +2,23 @@ import XCTest
 @testable import TrainerCore
 
 final class JungleIngredientsInventoryIncrementerTests: XCTestCase {
+    func testV106756JungleAndVillageScopesUseNewVillageDictionaryOffset() throws {
+        for scope in [JungleDLCInventoryScope.ingredientsAndVillageItems, .villageItems] {
+            let fixture = StaticJungleIngredientsFixture(layout: .v106756)
+            let session = InMemoryJungleIngredientsSession(segments: fixture.segments)
+            let result = try JungleIngredientsInventoryIncrementer(moduleResolver: fixture.moduleResolver, layout: .v106756).increment(
+                JungleIngredientsInventoryIncrementRequest(delta: 99, scope: scope), session: session
+            )
+            XCTAssertEqual(result.updatedItemCount, scope == .villageItems ? 2 : 4)
+            XCTAssertEqual(try session.readInt32(address: fixture.firstIngredientCountAddress), scope == .villageItems ? 10 : 109)
+            XCTAssertEqual(try session.readInt32(address: fixture.secondIngredientCountAddress), scope == .villageItems ? 20 : 119)
+            XCTAssertEqual(try session.readInt32(address: fixture.firstVillageItemCountAddress), 129)
+            XCTAssertEqual(try session.readInt32(address: fixture.secondVillageItemCountAddress), 139)
+            XCTAssertEqual(try session.readInt32(address: fixture.jungleInsectItemCountAddress), 50)
+            XCTAssertEqual(session.regionsCallCount, 0)
+        }
+    }
+
     func testIncrementerIncrementsExistingJungleDLCInventoryDictionariesWithoutHeapScan() throws {
         let fixture = StaticJungleIngredientsFixture()
         let session = InMemoryJungleIngredientsSession(segments: fixture.segments)
@@ -133,9 +150,9 @@ private struct StaticJungleIngredientsFixture {
     let moduleResolver: StaticJungleIngredientsModuleResolver
     let segments: [UInt64: Data]
 
-    init(storedDictionaryCount: Int32 = 3, entriesArrayLength: Int = 4, firstDefaultSlotIndex: Int = 3) {
+    init(storedDictionaryCount: Int32 = 3, entriesArrayLength: Int = 4, firstDefaultSlotIndex: Int = 3, layout: DaveRuntimeLayout = .v106675) {
         let moduleBaseAddress = UInt64(0x1_0000_0000)
-        let methodVariableAddress = moduleBaseAddress + 0x98D7948
+        let methodVariableAddress = moduleBaseAddress + layout.saveSystemInstanceMethodRVA
         let methodInfoAddress = UInt64(0x2_0000_0000)
         let genericContextAddress = UInt64(0x3_0000_0000)
         let genericClassAddress = UInt64(0x4_0000_0000)
@@ -173,12 +190,14 @@ private struct StaticJungleIngredientsFixture {
             gameDataManagerAddress: Self.gameDataManagerData(gameSaveAddress: gameSaveAddress),
             gameSaveAddress: Self.gameSaveData(
                 playerInfoAddress: playerInfoAddress,
-                jungleSaveDataAddress: jungleSaveDataAddress
+                jungleSaveDataAddress: jungleSaveDataAddress,
+                layout: layout
             ),
             playerInfoAddress: Self.runtimeObjectData(count: 0x18),
             jungleSaveDataAddress: Self.jungleSaveData(
                 ingredientsDictionaryAddress: ingredientsDictionaryAddress,
-                villageItemsDictionaryAddress: villageItemsDictionaryAddress
+                villageItemsDictionaryAddress: villageItemsDictionaryAddress,
+                layout: layout
             ),
             ingredientsDictionaryAddress: Self.dictionaryData(
                 entriesArrayAddress: ingredientsEntriesArrayAddress,
@@ -261,17 +280,17 @@ private struct StaticJungleIngredientsFixture {
         return data
     }
 
-    private static func gameSaveData(playerInfoAddress: UInt64, jungleSaveDataAddress: UInt64) -> Data {
-        var data = runtimeObjectData(count: 0x2B0)
-        data.writeUInt64(playerInfoAddress, at: 0x220)
-        data.writeUInt64(jungleSaveDataAddress, at: 0x2A8)
+    private static func gameSaveData(playerInfoAddress: UInt64, jungleSaveDataAddress: UInt64, layout: DaveRuntimeLayout) -> Data {
+        var data = runtimeObjectData(count: Int(layout.saveDataJungleOffset) + 8)
+        data.writeUInt64(playerInfoAddress, at: Int(layout.saveDataPlayerInfoOffset))
+        data.writeUInt64(jungleSaveDataAddress, at: Int(layout.saveDataJungleOffset))
         return data
     }
 
-    private static func jungleSaveData(ingredientsDictionaryAddress: UInt64, villageItemsDictionaryAddress: UInt64) -> Data {
-        var data = runtimeObjectData(count: 0x158)
+    private static func jungleSaveData(ingredientsDictionaryAddress: UInt64, villageItemsDictionaryAddress: UInt64, layout: DaveRuntimeLayout) -> Data {
+        var data = runtimeObjectData(count: Int(layout.jungleVillageItemsDictionaryOffset) + 8)
         data.writeUInt64(ingredientsDictionaryAddress, at: 0xA8)
-        data.writeUInt64(villageItemsDictionaryAddress, at: 0x150)
+        data.writeUInt64(villageItemsDictionaryAddress, at: Int(layout.jungleVillageItemsDictionaryOffset))
         return data
     }
 

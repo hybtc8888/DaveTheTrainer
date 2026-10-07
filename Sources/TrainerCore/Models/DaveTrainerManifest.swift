@@ -231,7 +231,14 @@ public struct DaveTrainerManifest: Equatable, Codable, Sendable {
 
 private enum DaveTrainerManifestFactory {
     static func makeCurrentFeatures() -> [DaveTrainerManifestFeature] {
-        let staticPatches = Dictionary(uniqueKeysWithValues: DefaultStaticGamePatches.make().map { ($0.id, $0) })
+        makeFullFeatures(
+            patches: DefaultStaticGamePatches.make(),
+            speedPatch: valuePatch(id: "swimSpeed", valueText: "5")
+        )
+    }
+
+    private static func makeFullFeatures(patches catalog: [StaticGamePatch], speedPatch: StaticGamePatch) -> [DaveTrainerManifestFeature] {
+        let staticPatches = Dictionary(uniqueKeysWithValues: catalog.map { ($0.id, $0) })
         return [
             codeFeature(.divingGod, title: "God 模式（Diving 全开）", patches: patches(["god", "oxygen", "ammo", "crabTraps", "weight", "damage", "drones"], in: staticPatches)),
             codeFeature(.god, title: "无敌/忽略伤害", patchID: "god", in: staticPatches),
@@ -239,7 +246,7 @@ private enum DaveTrainerManifestFactory {
             codeFeature(.ammo, title: "无限弹药/鱼叉资源", patchID: "ammo", in: staticPatches),
             codeFeature(.crabTraps, title: "无限鱼笼", patchID: "crabTraps", in: staticPatches),
             codeFeature(.weight, title: "无限负重", patchID: "weight", in: staticPatches),
-            codeFeature(.swimSpeed, title: "设置玩家移动速度", patch: valuePatch(id: "swimSpeed", valueText: "5")),
+            codeFeature(.swimSpeed, title: "设置玩家移动速度", patch: speedPatch),
             codeFeature(.damage, title: "超级伤害/一击必杀", patchID: "damage", in: staticPatches),
             codeFeature(.drones, title: "无限无人机", patchID: "drones", in: staticPatches),
             resourceFeature(.gold, title: "增加金币", capability: currencyCapability(id: "gold", kind: "main-gold", runtime: "PlayerInfoSave.m_Gold", save: "SaveData.playerInfo.m_Gold")),
@@ -280,24 +287,10 @@ private enum DaveTrainerManifestFactory {
     }
 
     static func makeV106756Features() -> [DaveTrainerManifestFeature] {
-        let staticPatches = Dictionary(
-            uniqueKeysWithValues: DaveV106756StaticGamePatches.make().map { ($0.id, $0) }
+        makeFullFeatures(
+            patches: DaveV106756StaticGamePatches.make(),
+            speedPatch: v106756ValuePatch(id: "swimSpeed", valueText: "5")
         )
-        return [
-            codeFeature(.god, title: "无敌/忽略伤害", patchID: "god", in: staticPatches),
-            codeFeature(.oxygen, title: "无限氧气", patchID: "oxygen", in: staticPatches),
-            codeFeature(.ammo, title: "无限弹药/鱼叉资源", patchID: "ammo", in: staticPatches),
-            codeFeature(.crabTraps, title: "无限鱼笼", patchID: "crabTraps", in: staticPatches),
-            codeFeature(.weight, title: "无限负重", patchID: "weight", in: staticPatches),
-            codeFeature(
-                .swimSpeed,
-                title: "设置玩家移动速度",
-                patch: v106756ValuePatch(id: "swimSpeed", valueText: "5")
-            ),
-            codeFeature(.drones, title: "无限无人机", patchID: "drones", in: staticPatches),
-            codeFeature(.stamina, title: "无限体力", patchID: "stamina", in: staticPatches),
-            codeFeature(.wasabi, title: "无限芥末", patchID: "wasabi", in: staticPatches)
-        ]
     }
 
     private static func codeFeature(_ id: DaveTrainerFeatureID, title: String, patchID: String, in patchesByID: [String: StaticGamePatch]) -> DaveTrainerManifestFeature {

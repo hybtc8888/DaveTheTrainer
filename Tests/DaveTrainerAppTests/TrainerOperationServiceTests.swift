@@ -123,21 +123,61 @@ final class TrainerOperationServiceTests: XCTestCase {
         XCTAssertTrue(baselineApplier.requests.isEmpty)
     }
 
-    func testV106756UnsupportedFeatureIsRejectedWithoutWritingMemory() throws {
+    func testV106756AllPlayerFeaturesAreSupportedAndDamageUsesNewTargets() throws {
         let applier = RecordingTrainerOperationApplier()
         let service = TrainerOperationService(configuration: .v106756(applier: applier))
-
+        for featureID in DaveTrainerFeatureID.allCases {
+            XCTAssertNil(service.buildCompatibilityFailure(featureID: featureID, gameBuild: KnownGameBuild.v106756))
+        }
         let result = try service.apply(
-            TrainerOperationRequest(
-                featureID: .damage,
-                isEnabled: true,
-                payload: .staticPatch(patchID: "damage")
-            ),
+            TrainerOperationRequest(featureID: .damage, isEnabled: true, payload: .staticPatch(patchID: "damage")),
             context: TrainerOperationContext(session: Self.session(), gameBuild: KnownGameBuild.v106756)
         )
+        XCTAssertEqual(result.state, .bytesApplied)
+        XCTAssertEqual(result.targetIDs, (3...23).map { "damage.\($0)" })
+        XCTAssertEqual(applier.requests.first?.patch.points.first?.rva, 0x1E2FBA8)
+    }
 
-        XCTAssertEqual(result.state, .unsupportedBuild)
-        XCTAssertTrue(result.message.contains("尚未验证功能 damage"))
+    func testV106756AllResourceControlsRouteToTheirIncrementers() throws {
+        let quantity = RecordingRuntimeQuantityIncrementer(result: RuntimeQuantityIncrementResult(updatedAddressCount: 1))
+        let ingredients = RecordingIngredientsInventoryIncrementer(result: IngredientsInventoryIncrementResult(updatedItemCount: 1))
+        let jungle = RecordingJungleIngredientsInventoryIncrementer(result: JungleIngredientsInventoryIncrementResult(updatedItemCount: 1))
+        let service = TrainerOperationService(configuration: .v106756(
+            applier: RecordingTrainerOperationApplier(),
+            runtimeQuantityIncrementer: quantity,
+            ingredientsIncrementer: ingredients,
+            jungleIngredientsIncrementer: jungle
+        ))
+        let context = TrainerOperationContext(session: Self.session(), gameBuild: KnownGameBuild.v106756)
+        var operations: [(DaveTrainerFeatureID, TrainerOperationPayload)] = [.gold, .bei, .jungleGold, .artisan].map {
+            ($0, .runtimeQuantity(resourceID: $0, valueText: "99"))
+        }
+        operations += [
+            (.ingredients, .inventory(scope: .all, valueText: "99")),
+            (.fishIngredients, .inventory(scope: .fish, valueText: "99")),
+            (.vegetableIngredients, .inventory(scope: .vegetable, valueText: "99")),
+            (.seasoningIngredients, .inventory(scope: .seasoning, valueText: "99")),
+            (.upgradeMaterials, .inventory(scope: .upgrade, valueText: "99")),
+            (.jungleIngredients, .jungleInventory(scope: .ingredientsAndVillageItems, valueText: "99")),
+            (.seaPeopleVillageItems, .jungleInventory(scope: .villageItems, valueText: "99"))
+        ]
+        for (featureID, payload) in operations {
+            let result = try service.apply(TrainerOperationRequest(featureID: featureID, isEnabled: true, payload: payload), context: context)
+            XCTAssertEqual(result.state, .behaviorVerified)
+        }
+        XCTAssertEqual(quantity.requests.map(\.featureID), ["gold", "bei", "jungleGold", "artisan"])
+        XCTAssertEqual(ingredients.requests.map(\.scope), [.all, .fish, .vegetable, .seasoning, .upgrade])
+        XCTAssertEqual(jungle.requests.map(\.scope), [.ingredientsAndVillageItems, .villageItems])
+    }
+
+    func testV106756ResourceCannotUseAnUnreviewedCodePatch() throws {
+        let applier = RecordingTrainerOperationApplier()
+        let service = TrainerOperationService(configuration: .v106756(applier: applier))
+        let result = try service.apply(
+            TrainerOperationRequest(featureID: .gold, isEnabled: true, payload: .valuePatch(patchID: "gold", valueText: "999")),
+            context: TrainerOperationContext(session: Self.session(), gameBuild: KnownGameBuild.v106756)
+        )
+        XCTAssertEqual(result.state, .targetMismatch)
         XCTAssertTrue(applier.preflightRequests.isEmpty)
         XCTAssertTrue(applier.requests.isEmpty)
     }
@@ -162,7 +202,12 @@ final class TrainerOperationServiceTests: XCTestCase {
             0x210BDFC,
             0xB81BC8,
             0x1029FDC,
+            0xFDE3B0,
             0xF7FB70,
+            0xF7EAC8,
+            0xF7EAD0,
+            0x1800730,
+            0x17F5FD4,
             0x116F610,
             0x1178B3C
         ])
@@ -582,7 +627,12 @@ private extension TrainerOperationService.Configuration {
         )
     }
 
-    static func v106756(applier: StaticPatchApplying) -> TrainerOperationService.Configuration {
+    static func v106756(
+        applier: StaticPatchApplying,
+        runtimeQuantityIncrementer: RuntimeQuantityIncrementing = RecordingRuntimeQuantityIncrementer(),
+        ingredientsIncrementer: IngredientsInventoryIncrementing = RecordingIngredientsInventoryIncrementer(),
+        jungleIngredientsIncrementer: JungleIngredientsInventoryIncrementing = RecordingJungleIngredientsInventoryIncrementer()
+    ) -> TrainerOperationService.Configuration {
         let manifest = DaveTrainerManifest.v106756
         return TrainerOperationService.Configuration(
             manifest: manifest,
@@ -591,9 +641,9 @@ private extension TrainerOperationService.Configuration {
             ),
             valuePatchFactory: DaveV106756StaticGamePatches.makeValuePatch(id:valueText:),
             applier: applier,
-            runtimeQuantityIncrementer: RecordingRuntimeQuantityIncrementer(),
-            ingredientsIncrementer: RecordingIngredientsInventoryIncrementer(),
-            jungleIngredientsIncrementer: RecordingJungleIngredientsInventoryIncrementer(),
+            runtimeQuantityIncrementer: runtimeQuantityIncrementer,
+            ingredientsIncrementer: ingredientsIncrementer,
+            jungleIngredientsIncrementer: jungleIngredientsIncrementer,
             intentionallyUnsupportedFeatureIDs: Set(DaveTrainerFeatureID.allCases).subtracting(
                 manifest.features.map(\.id)
             )

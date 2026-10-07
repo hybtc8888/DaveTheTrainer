@@ -5,11 +5,21 @@ public enum DaveV106756StaticGamePatches {
         let targetID: String
         let rva: UInt64
         let expectedBytes: [UInt8]?
+        let patchBytes: [UInt8]?
+        let trampoline: StaticPatchTrampoline?
 
-        init(targetID: String, rva: UInt64, expectedBytes: [UInt8]? = nil) {
+        init(
+            targetID: String,
+            rva: UInt64,
+            expectedBytes: [UInt8]? = nil,
+            patchBytes: [UInt8]? = nil,
+            trampoline: StaticPatchTrampoline? = nil
+        ) {
             self.targetID = targetID
             self.rva = rva
             self.expectedBytes = expectedBytes
+            self.patchBytes = patchBytes
+            self.trampoline = trampoline
         }
     }
 
@@ -19,6 +29,7 @@ public enum DaveV106756StaticGamePatches {
         "ammo",
         "crabTraps",
         "weight",
+        "damage",
         "drones",
         "stamina",
         "wasabi"
@@ -33,6 +44,10 @@ public enum DaveV106756StaticGamePatches {
         VerifiedPoint(targetID: "god.4", rva: 0x1BC9E40),
         VerifiedPoint(targetID: "god.5", rva: 0x1BC62F8),
         VerifiedPoint(targetID: "god.6", rva: 0x1BC6318),
+        // x20 addresses the player insect; x19 addresses the enemy insect.
+        VerifiedPoint(targetID: "god.7", rva: 0xDF38E0, expectedBytes: [0x01, 0x3D, 0x40, 0xB9]),
+        VerifiedPoint(targetID: "god.8", rva: 0xDF3BBC, expectedBytes: [0xE1, 0x03, 0x00, 0xAA]),
+        VerifiedPoint(targetID: "god.9", rva: 0x1959940, expectedBytes: [0xE0, 0x0C, 0x00, 0xB4], trampoline: rpgTrampoline(kind: .rpgDamagePolicyIgnoreDamage)),
         VerifiedPoint(targetID: "oxygen.0", rva: 0x14158D8),
         VerifiedPoint(targetID: "oxygen.1", rva: 0x1418594),
         VerifiedPoint(targetID: "oxygen.2", rva: 0x1BC023C),
@@ -88,6 +103,27 @@ public enum DaveV106756StaticGamePatches {
                 0x13, 0xE6, 0x03, 0xD0
             ]
         ),
+        VerifiedPoint(targetID: "damage.3", rva: 0x1E2FBA8, expectedBytes: [0xE0, 0x03, 0x13, 0xAA, 0xEF, 0xF8, 0xFF, 0x97, 0xF5, 0x03, 0x00, 0xAA], patchBytes: (try! Arm64ReturnCode.moveInt32ToW21(999_999)) + [0x1F, 0x20, 0x03, 0xD5]),
+        VerifiedPoint(targetID: "damage.4", rva: 0x13A4834, expectedBytes: [0xE0, 0x03, 0x14, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0x71, 0x90, 0x24, 0x94]),
+        VerifiedPoint(targetID: "damage.5", rva: 0x13A4904, expectedBytes: [0xE0, 0x03, 0x14, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0x3D, 0x90, 0x24, 0x94, 0xF4, 0x03, 0x00, 0xAA]),
+        VerifiedPoint(targetID: "damage.6", rva: 0x13B5A58, expectedBytes: [0xE0, 0x03, 0x15, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0xE8, 0x4B, 0x24, 0x94, 0xF4, 0x03, 0x00, 0xAA]),
+        VerifiedPoint(targetID: "damage.7", rva: 0x14A0860, expectedBytes: [0xE0, 0x03, 0x14, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0x66, 0xA0, 0x20, 0x94]),
+        VerifiedPoint(targetID: "damage.8", rva: 0x152BE14, expectedBytes: [0x80, 0x42, 0x00, 0x91, 0x01, 0x00, 0x80, 0xD2, 0xF9, 0x72, 0x1E, 0x94, 0xF6, 0x03, 0x00, 0xAA]),
+        VerifiedPoint(targetID: "damage.9", rva: 0x15E75C0, expectedBytes: [0xE0, 0x03, 0x15, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0x0E, 0x85, 0x1B, 0x94]),
+        VerifiedPoint(targetID: "damage.10", rva: 0x17188B0, expectedBytes: [0xE0, 0x03, 0x01, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0x52, 0xC0, 0x16, 0x94]),
+        VerifiedPoint(targetID: "damage.11", rva: 0x1718908, expectedBytes: [0xE0, 0x03, 0x14, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0x3C, 0xC0, 0x16, 0x94]),
+        VerifiedPoint(targetID: "damage.12", rva: 0x1728170, expectedBytes: [0xE0, 0x03, 0x01, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0x22, 0x82, 0x16, 0x94, 0xF4, 0x03, 0x00, 0xAA]),
+        VerifiedPoint(targetID: "damage.13", rva: 0x1CC7FE4, expectedBytes: [0xE0, 0x03, 0x13, 0xAA, 0x86, 0x02, 0x00, 0x94]),
+        VerifiedPoint(targetID: "damage.14", rva: 0x1CC8068, expectedBytes: [0xE0, 0x03, 0x13, 0xAA, 0x65, 0x02, 0x00, 0x94]),
+        VerifiedPoint(targetID: "damage.15", rva: 0x1CDAD58, expectedBytes: [0xE0, 0x03, 0x00, 0x91, 0x01, 0x00, 0x80, 0xD2, 0x28, 0xB7, 0xFF, 0x97, 0xE1, 0x03, 0x00, 0xAA]),
+        VerifiedPoint(targetID: "damage.16", rva: 0x1E4E280, expectedBytes: [0xE0, 0x03, 0x14, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0xDE, 0xE9, 0xF9, 0x97]),
+        VerifiedPoint(targetID: "damage.17", rva: 0x1F883A8, expectedBytes: [0xE0, 0x03, 0x14, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0x94, 0x01, 0xF5, 0x97]),
+        VerifiedPoint(targetID: "damage.18", rva: 0x1F884DC, expectedBytes: [0xE0, 0x03, 0x14, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0x47, 0x01, 0xF5, 0x97]),
+        VerifiedPoint(targetID: "damage.19", rva: 0x1F8877C, expectedBytes: [0xE0, 0x03, 0x14, 0xAA, 0x01, 0x00, 0x80, 0xD2, 0x9F, 0x00, 0xF5, 0x97, 0xF4, 0x03, 0x00, 0xAA]),
+        VerifiedPoint(targetID: "damage.20", rva: 0xDF3940, expectedBytes: [0x01, 0x3D, 0x40, 0xB9, 0x02, 0x00, 0x80, 0xD2]),
+        VerifiedPoint(targetID: "damage.21", rva: 0xDF39EC, expectedBytes: [0x5F, 0x03, 0x00, 0x71, 0x41, 0x57, 0x9A, 0x5A]),
+        VerifiedPoint(targetID: "damage.22", rva: 0xDF3AB4, expectedBytes: [0x5F, 0x03, 0x00, 0x71, 0x41, 0x57, 0x9A, 0x5A]),
+        VerifiedPoint(targetID: "damage.23", rva: 0x1959940, expectedBytes: [0xE0, 0x0C, 0x00, 0xB4], trampoline: rpgTrampoline(kind: .rpgDamagePolicySuperDamage)),
         VerifiedPoint(targetID: "drones.0", rva: 0xB7B138),
         VerifiedPoint(targetID: "drones.1", rva: 0x1D962AC),
         VerifiedPoint(targetID: "drones.2", rva: 0xB7B140),
@@ -121,11 +157,18 @@ public enum DaveV106756StaticGamePatches {
         VerifiedPoint(targetID: "wasabi.4", rva: 0x21D4D24)
     ]
 
+    // The farm and village literal/branch distances are unchanged: +12/+16 and +12.
+    // Their exact encodings are covered by DaveV106756ProfileTests.
     private static let swimSpeedVerifiedPoints = [
         VerifiedPoint(targetID: "swimSpeed.0", rva: 0x210BDFC),
         VerifiedPoint(targetID: "swimSpeed.1", rva: 0xB81BC8),
         VerifiedPoint(targetID: "swimSpeed.2", rva: 0x1029FDC),
+        VerifiedPoint(targetID: "swimSpeed.3", rva: 0xFDE3B0),
         VerifiedPoint(targetID: "swimSpeed.4", rva: 0xF7FB70),
+        VerifiedPoint(targetID: "swimSpeed.5", rva: 0xF7EAC8),
+        VerifiedPoint(targetID: "swimSpeed.6", rva: 0xF7EAD0),
+        VerifiedPoint(targetID: "swimSpeed.7", rva: 0x1800730),
+        VerifiedPoint(targetID: "swimSpeed.8", rva: 0x17F5FD4),
         VerifiedPoint(targetID: "swimSpeed.9", rva: 0x116F610),
         VerifiedPoint(targetID: "swimSpeed.10", rva: 0x1178B3C)
     ]
@@ -159,6 +202,20 @@ public enum DaveV106756StaticGamePatches {
         return patch
     }
 
+    private static func rpgTrampoline(kind: StaticPatchTrampolineKind) -> StaticPatchTrampoline {
+        // DealDamage retains x20 = target, w21 = damage, x0 = health at this hook.
+        // BattleUtils.IsEnemy keeps player and enemy damage policies independent.
+        StaticPatchTrampoline(
+            kind: kind,
+            value: 999_999,
+            resumeRVA: 0x1959944,
+            nullHandlerRVA: 0x1959ADC,
+            helperRVA: 0x195F3B0,
+            codeCaveRVA: 0x940,
+            codeCaveExpectedBytes: Array(repeating: 0, count: 72)
+        )
+    }
+
     private static func relocatedPatch(
         _ baseline: StaticGamePatch,
         evidenceByID: [String: VerifiedPoint]
@@ -168,7 +225,7 @@ public enum DaveV106756StaticGamePatches {
             guard let evidence = evidenceByID[targetID] else {
                 return nil
             }
-            precondition(point.trampoline == nil, "Unverified trampoline in v1.0.6.756 profile: \(targetID)")
+            precondition(point.trampoline == nil || evidence.trampoline != nil, "Unverified trampoline in v1.0.6.756 profile: \(targetID)")
             return relocatedPoint(point, evidence: evidence)
         }
         precondition(!points.isEmpty, "v1.0.6.756 patch has no verified points: \(baseline.id)")
@@ -182,10 +239,11 @@ public enum DaveV106756StaticGamePatches {
         StaticPatchPoint(
             rva: evidence.rva,
             expectedBytes: evidence.expectedBytes ?? baseline.expectedBytes,
-            patchBytes: baseline.patchBytes,
+            patchBytes: evidence.patchBytes ?? baseline.patchBytes,
             note: baseline.note,
             acceptsLegacyIntReturnPatch: baseline.acceptsLegacyIntReturnPatch,
             acceptsCompatibleAppliedPatch: baseline.acceptsCompatibleAppliedPatch,
+            trampoline: evidence.trampoline,
             targetID: evidence.targetID
         )
     }

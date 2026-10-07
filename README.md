@@ -33,7 +33,8 @@ but memory writes require an exact reviewed profile.
 | App type | Native SwiftUI app |
 | Package manager | Swift Package Manager |
 | Validated baseline build | `v1.0.6.675.mac` |
-| Evidence-backed partial builds | `v1.0.6.710.mac`, `v1.0.6.756.mac` |
+| Evidence-backed partial build | `v1.0.6.710.mac` |
+| All-control profile, gameplay verification pending | `v1.0.6.756.mac` |
 | Target module | `GameAssembly.dylib` |
 | Manifest schema | `1.0` |
 | Test coverage | XCTest coverage for manifest policy, patch transactions, runtime incrementers, release scripts, and player path contracts |
@@ -68,7 +69,7 @@ xattr -dr com.apple.quarantine /Applications/DaveTheTrainer.app
 
 This repository's fully validated profile is `v1.0.6.675.mac`. It also contains
 an evidence-backed partial profile for `v1.0.6.710.mac`, derived from the
-compatibility report attached to issue #2, and a locally byte-verified partial
+compatibility report attached to issue #2, and a locally reviewed all-control
 profile for `v1.0.6.756.mac`. The trainer may be installed
 anywhere, and it resolves Steam custom libraries and standalone Unity bundles
 from the running process. This path flexibility does not make fixed patch RVAs
@@ -78,7 +79,7 @@ portable across game updates.
 | --- | --- |
 | `v1.0.6.675.mac` | Full baseline profile |
 | `v1.0.6.710.mac` | 72 exact targets for god mode, oxygen, ammo, crab traps, weight, partial player speed, drones, stamina, and wasabi; other controls are disabled |
-| `v1.0.6.756.mac` | 72 exact targets for god mode, oxygen, ammo, crab traps, weight, partial player speed, drones, stamina, and wasabi; other controls are disabled |
+| `v1.0.6.756.mac` | All 22 controls; 101 reviewed code targets plus version-specific currency and inventory paths; gameplay verification pending |
 
 The `.710` targets are byte-verified against the reporter's GameAssembly and
 guarded by its exact UUID. They have not been behavior-tested on the maintainer's
@@ -86,8 +87,9 @@ machine because that game build is not locally available. Enable its supported
 features individually and treat `bytesApplied` as distinct from in-game
 behavior confirmation. See [the evidence note](docs/compatibility-v1.0.6.710.mac.md).
 
-The `.756` profile has 72 target windows checked against a local arm64 binary.
-Gameplay effects remain unverified. See [its evidence note](docs/compatibility-v1.0.6.756.mac.md).
+The `.756` profile exposes all 22 controls. Its 101 code target windows and RPG
+code cave match the local arm64 binary, and its resource layout follows the new
+metadata field offsets. Gameplay effects remain unverified. See [its evidence note](docs/compatibility-v1.0.6.756.mac.md).
 
 Player memory writes require the manifest's exact bundle ID, version, build
 GUID, and GameAssembly arm64 UUID. An unknown build remains detectable and can
