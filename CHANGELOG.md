@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Distinguish hardened-target signing denial from missing administrator elevation, sign trainer bundles with the debugging-tool entitlement, and provide an explicit opt-in script for an independent debug game copy.
+
 - Add an exact all-control profile for `v1.0.6.756.mac`, bound to its build GUID and arm64 GameAssembly UUID.
 - Enable all 22 controls with 101 byte-verified code targets, enemy-specific damage policies, complete active speed targets, and a reviewed version-specific runtime resource layout.
 - Add build-routing, resource-layout, damage-policy and rejection tests plus an optional read-only local binary check. Gameplay effects remain unverified.

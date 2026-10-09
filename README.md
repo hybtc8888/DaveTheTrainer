@@ -219,6 +219,10 @@ build fingerprints and targeted manifest byte samples. It omits absolute
 paths and full extracted symbol names. Other logs or manually collected data
 should still be redacted before publication.
 
+An `Admin: Enabled` status does not override a hardened game signature that
+disallows debugging. Failed attaches now distinguish this target policy from
+missing elevation. An independent debug copy requires explicit authorization.
+
 See [Permissions And Privacy](docs/permissions-and-privacy.md) for the detailed
 policy.
 

@@ -108,10 +108,11 @@ validation, cache invalidation, and write-readback checks are retained.
 The application builds locally with the installed macOS 26.5 SDK. Exact build,
 UUID and all 101 code windows match the installed binary, and the RPG padding
 matches its expected 72 zero bytes. A temporary standalone assertion runner
-executed 117 diagnostic routines from the repository's profile, routing,
+executed 124 diagnostic routines from the repository's profile, routing,
 resource fixtures, ARM64 encoding and transaction checks, including new-layout
 currency, all ingredient categories, jungle/village scopes and rejection of old
-singleton slots. This is supplementary verification, not an XCTest run.
+singleton slots, Mach self-memory access and attach-error diagnostics. This is
+supplementary verification, not an XCTest run.
 
 `swift test` was attempted but this Command Line Tools installation lacks the
 XCTest framework. The upstream macOS CI run for this first-time contribution
@@ -136,3 +137,19 @@ modified during this review. A read-only attach attempt was denied by macOS
 `task_for_pid`; resource paths were exercised with fixtures rather than a live
 save. Full in-game behavior validation remains pending; code-patch readback
 reports `bytesApplied`, not confirmed gameplay behavior.
+
+## Attach Permission Follow-up (2026-10-09)
+
+The installed game uses Hardened Runtime without `get-task-allow`. A root
+trainer can still receive `task_for_pid ... failure (5)` in this case. Signing
+policy diagnostics now explain this restriction, and trainer bundles carry the
+debugging-tool entitlement. This does not override the target's protection.
+
+An explicitly authorized local debug copy was created with
+`script/prepare_debug_game_copy.py`. The copy retains the original entitlements
+and adds `get-task-allow` to its launcher only. Its signature verifies; original
+critical file hashes, copied build identity, GameAssembly and metadata remain
+unchanged. The script was also exercised on an independently signed fixture,
+including missing-authorization and existing-destination rejection. The Steam
+installation and user saves were not modified by this preparation. Live attach
+to the debug copy and gameplay verification remain pending.

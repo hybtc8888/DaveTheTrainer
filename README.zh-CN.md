@@ -128,6 +128,10 @@ DaveTheTrainer 会修改本机正在运行的游戏进程。macOS 可能要求�
 在用户点击后写成本地 JSON，其中包含构建指纹和定向的 manifest 目标字节，不含绝对路径和
 完整提取符号名。其他日志或手工收集的数据在公开前仍应脱敏。
 
+如果已显示 `Admin: Enabled`，但仍报 `task_for_pid ... failure (5)`，可能是游戏
+的 Hardened Runtime 签名未允许调试附加。修改器现在会识别并说明这类拦截；
+重复输入管理员密码不能解除目标的签名保护。独立调试副本需要明确授权，原包与存档保留。
+
 详细说明见 [Permissions And Privacy](docs/permissions-and-privacy.md)。
 
 ## 从源码构建
