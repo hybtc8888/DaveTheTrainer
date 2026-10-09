@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Handle empty jungle/village managed dictionaries without dereferencing a null entries array, while rejecting null arrays for nonempty dictionaries.
+- Record normal-user Steam-original attach, live apply/readback/restore for all 11 code controls, UI oxygen/gold verification and live resource-planning limits.
 - Add an explicit Steam-installation debug-permission workflow with a complete original backup, constrained signing changes, failure rollback and exact signature restoration, preserving normal Steam launching.
 - Distinguish hardened-target signing denial from missing administrator elevation, sign trainer bundles with the debugging-tool entitlement, and provide an explicit opt-in script for an independent debug game copy.
 

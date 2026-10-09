@@ -108,10 +108,11 @@ validation, cache invalidation, and write-readback checks are retained.
 The application builds locally with the installed macOS 26.5 SDK. Exact build,
 UUID and all 101 code windows match the installed binary, and the RPG padding
 matches its expected 72 zero bytes. A temporary standalone assertion runner
-executed 124 diagnostic routines from the repository's profile, routing,
+executed 125 diagnostic routines from the repository's profile, routing,
 resource fixtures, ARM64 encoding and transaction checks, including new-layout
 currency, all ingredient categories, jungle/village scopes and rejection of old
-singleton slots, Mach self-memory access and attach-error diagnostics. This is
+singleton slots, Mach self-memory access, attach-error diagnostics, and empty
+managed dictionaries with null entries arrays. This is
 supplementary verification, not an XCTest run.
 
 `swift test` was attempted but this Command Line Tools installation lacks the
@@ -132,16 +133,15 @@ skips. Game binaries, symbol-table dumps, compatibility reports and saves are
 not committed.
 
 Runtime still requires exact build identity and module UUID, code-byte
-preflight, transactional code writes, and readback. No live process memory was
-modified during this review. The Steam target denied `task_for_pid`; an
-authorized debug copy subsequently allowed normal-user attach. All 101 loaded
-code windows and the module UUID were verified through read-only process
-access. Resource paths were exercised with fixtures rather than a live save. Full in-game behavior validation remains pending; code-patch readback
-reports `bytesApplied`, not confirmed gameplay behavior.
+preflight, transactional code writes, and readback. The initial permission
+investigation used a read-only debug copy. Subsequent authorized Steam-original
+checks below verify live code writes and the UI gold operation. Full in-game
+behavior validation remains pending; code-patch readback reports `bytesApplied`,
+not confirmed gameplay behavior.
 
 ## Attach Permission Follow-up (2026-10-09)
 
-The installed game uses Hardened Runtime without `get-task-allow`. A root
+The vendor-signed installation uses Hardened Runtime without `get-task-allow`. A root
 trainer can still receive `task_for_pid ... failure (5)` in this case. Signing
 policy diagnostics now explain this restriction, and trainer bundles carry the
 debugging-tool entitlement. This does not override the target's protection.
@@ -179,5 +179,37 @@ process listing for its running-target guard. No proprietary fixtures are used.
 The actual Steam original was fully backed up and, with explicit authorization
 on 2026-10-09, received the reviewed debug entitlement. Strict signature
 verification passes; the full file manifest confirms that only the launcher
-and resource signature changed, with existing entitlements retained. Direct
-Steam launch and live feature writes remain pending.
+and resource signature changed, with existing entitlements retained.
+
+## Steam-Original Live Verification (2026-10-09)
+
+The user launched the installed game from Steam. Its canonical process path
+matches the original Steam installation, and the exact build and loaded module
+UUID match the reviewed profile. The preview UI attaches with administrator
+mode disabled; a separately signed normal-user probe matches all 101 loaded
+code windows.
+
+All 11 code controls, including speed and combined Diving God mode, completed
+enable/readback/restore transactions. After each transaction, all 101 windows
+and the 72-byte RPG code cave match the original baseline. The preview UI's
+oxygen toggle also writes all four expected windows and restores them; a
+separate process probe confirms both states.
+
+After loading an existing save, read-only resource planning exercises the
+actual live object traversal and intercepted write/readback paths for gold,
+Bei, jungle currency, main/jungle artisan flame, all main ingredients, fish,
+vegetables and seasonings. These eight controls have valid live targets. The
+remaining upgrade-material and two jungle/village inventory scopes have no
+existing entries in this save; populated fixtures cover those paths. An empty
+managed dictionary with a null entries array now reports no existing inventory
+rather than an invalid pointer; nonempty dictionaries still require valid
+entries. The regression check covers both `.675` and `.756` without writes.
+
+The preview UI applied gold `+1`. A separate normal-user probe confirmed the
+complete 20-byte ObscuredInt payload, then restored and reread the exact original
+bytes. No inventory writes were committed and no save files were directly
+written by the trainer or probes. The complete save directory was backed up
+before loading; the game's save change predates the gold test. Actual diving,
+combat, restaurant effects, populated jungle inventory writes and full XCTest
+execution remain unverified. Local debug-signature access may be reset by a
+Steam update or file verification.

@@ -307,6 +307,11 @@ public final class JungleIngredientsInventoryIncrementer {
         session: JungleIngredientsInventoryMemorySession
     ) throws {
         try validateRuntimeObjectHeader(address: address, session: session)
+        // An empty managed Dictionary may have no allocated entries array.
+        let dictionary = JungleSaveDictionary(address: address, descriptor: descriptor)
+        guard try readDictionaryEntryCount(dictionary: dictionary, session: session) > 0 else {
+            return
+        }
         _ = try readAlignedPointer(
             address: address + jungleIngredientsDictionaryEntriesOffset,
             context: "\(descriptor.context).entries",
