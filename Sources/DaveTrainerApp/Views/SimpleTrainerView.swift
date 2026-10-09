@@ -46,7 +46,7 @@ private struct SimpleSidePanel: View {
             Text("Process ID: \(store.targetProcess.map { String($0.pid) } ?? "Not Found")")
             Text("Attach: \(store.isAttached ? "Ready" : "Not Attached")")
                 .foregroundStyle(store.isAttached ? .green : .orange)
-            Text("Admin: \(store.isRunningAsAdministrator ? "Enabled" : "Required")")
+            Text("Admin: \(store.isRunningAsAdministrator ? "Enabled" : "Not Enabled")")
                 .foregroundStyle(store.isRunningAsAdministrator ? .green : .orange)
         }
         .font(.callout.weight(.semibold))

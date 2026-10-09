@@ -133,9 +133,10 @@ not committed.
 
 Runtime still requires exact build identity and module UUID, code-byte
 preflight, transactional code writes, and readback. No live process memory was
-modified during this review. A read-only attach attempt was denied by macOS
-`task_for_pid`; resource paths were exercised with fixtures rather than a live
-save. Full in-game behavior validation remains pending; code-patch readback
+modified during this review. The Steam target denied `task_for_pid`; an
+authorized debug copy subsequently allowed normal-user attach. All 101 loaded
+code windows and the module UUID were verified through read-only process
+access. Resource paths were exercised with fixtures rather than a live save. Full in-game behavior validation remains pending; code-patch readback
 reports `bytesApplied`, not confirmed gameplay behavior.
 
 ## Attach Permission Follow-up (2026-10-09)
@@ -151,5 +152,8 @@ and adds `get-task-allow` to its launcher only. Its signature verifies; original
 critical file hashes, copied build identity, GameAssembly and metadata remain
 unchanged. The script was also exercised on an independently signed fixture,
 including missing-authorization and existing-destination rejection. The Steam
-installation and user saves were not modified by this preparation. Live attach
-to the debug copy and gameplay verification remain pending.
+installation and user saves were not modified by this preparation. The corrected preview successfully attached to the copy without administrator
+elevation. A separately signed read-only probe also attached as the normal
+user, verified the exact build and loaded module UUID, and matched all 101
+expected code windows. No feature was enabled or game memory written. Full
+gameplay and real-save resource verification remain pending.

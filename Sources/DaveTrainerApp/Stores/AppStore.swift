@@ -332,7 +332,7 @@ final class AppStore: ObservableObject {
         }
 
         hasRequestedAdministratorRelaunch = true
-        log("管理员权限未启用。点“管理员模式”并通过系统提示授权后再写入游戏进程。", isError: true)
+        log("管理员模式未启用。请先点“一键准备”连接游戏；若附加失败，再按报错提示处理权限。", isError: false)
     }
 
     func refreshAddressBook() {
