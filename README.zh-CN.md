@@ -130,7 +130,9 @@ DaveTheTrainer 会修改本机正在运行的游戏进程。macOS 可能要求�
 
 如果已显示 `Admin: Enabled`，但仍报 `task_for_pid ... failure (5)`，可能是游戏
 的 Hardened Runtime 签名未允许调试附加。修改器现在会识别并说明这类拦截；
-重复输入管理员密码不能解除目标的签名保护。独立调试副本需要明确授权，原包与存档保留。
+重复输入管理员密码不能解除目标的签名保护。要保持从 Steam 正常启动的使用方式，可先明确授权为
+Steam 原包准备调试权限；此操作会更改本机签名，必须先保留完整原包备份。游戏模块、资源和存档不变。
+独立副本仍可用于可选调试验证。步骤与恢复说明见下方权限文档。
 
 详细说明见 [Permissions And Privacy](docs/permissions-and-privacy.md)。
 

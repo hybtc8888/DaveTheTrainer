@@ -40,7 +40,7 @@ struct MachAttachDiagnostics {
         let context = "task_for_pid(\(pid)) failed: \(machError)"
         if targetPolicy == .hardenedWithoutDebugPermission {
             let mode = isAdministrator ? "管理员模式已启用。" : "当前还未启用管理员模式。"
-            return "\(mode)目标游戏启用了 Hardened Runtime，但签名未允许调试附加（get-task-allow）；仅输入管理员密码不能解除该保护。请使用明确允许调试的独立游戏副本，再尝试连接。\(context)"
+            return "\(mode)目标游戏启用了 Hardened Runtime，但签名未允许调试附加（get-task-allow）；仅输入管理员密码不能解除该保护。请先保存并退出游戏，按权限说明为 Steam 安装启用调试权限，再重新从 Steam 启动并连接。\(context)"
         }
         if !isAdministrator {
             return "当前修改器未以管理员身份运行，请点击“管理员模式”授权后重试。\(context)"

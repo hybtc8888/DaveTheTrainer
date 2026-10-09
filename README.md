@@ -221,7 +221,10 @@ should still be redacted before publication.
 
 An `Admin: Enabled` status does not override a hardened game signature that
 disallows debugging. Failed attaches now distinguish this target policy from
-missing elevation. An independent debug copy requires explicit authorization.
+missing elevation. For normal Steam launching, an explicitly authorized setup
+can enable debugging on the Steam installation after creating a full backup.
+This replaces its local launcher signature while preserving game modules,
+resources and saves. An independent copy remains an optional test route.
 
 See [Permissions And Privacy](docs/permissions-and-privacy.md) for the detailed
 policy.

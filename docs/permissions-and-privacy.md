@@ -48,6 +48,46 @@ See Apple's [debugging tool entitlement documentation](https://developer.apple.c
 Trainer bundles include the debugging-tool entitlement. This allows attaching
 to eligible debug targets; it does not remove a target game's signing policy.
 
+## Normal Steam Launching
+
+`script/enable_steam_game_debugging.py` provides a separate, explicit setup for
+the reviewed `.756.mac` Steam build. It does not run automatically from the GUI.
+Save and quit the game before preparation or signing. Its three commands are:
+
+```bash
+# Read and clone only: keep a full exact original and prepare a signed payload.
+python3 script/enable_steam_game_debugging.py prepare \
+  "/path/to/Steam/DaveTheDiver.app" \
+  "/path/to/new/preparation" --backup "/path/to/new/original-backup"
+
+# Only after explicit authorization to replace the Steam game's local signature.
+python3 script/enable_steam_game_debugging.py apply \
+  "/path/to/new/preparation/receipt.json" --allow-original-resign
+
+# With the game closed, restore its exact original signing files.
+python3 script/enable_steam_game_debugging.py restore \
+  "/path/to/new/preparation/receipt.json"
+```
+
+Preparation verifies the reviewed version, build GUID and complete
+GameAssembly/metadata hashes. It compares all original and backed-up files and
+allows changes only to the launcher and `Contents/_CodeSignature/CodeResources`.
+Application rechecks the unchanged installation and backup, retains existing
+entitlements, adds `get-task-allow`, verifies the signature and complete file
+manifest, and records the applied hashes. A failed application restores the
+original signing files. Restore refuses to put an old signature over a changed
+Steam installation and works without the staged payload.
+
+The official local launcher signature is replaced with an ad-hoc debug signature.
+Local debugging tools can then access the game process. GameAssembly, metadata,
+resources, bundle identity and the Steam launch path are retained; saves are not
+edited. No SIP, Developer Tools setting or privileged helper is changed. After
+setup, launch the game normally from Steam and attach the trainer. Steam updates
+or file verification can restore the official signature; a changed build still
+requires its own reviewed profile and setup evidence.
+
+## Optional Independent Debug Copy
+
 For an explicitly authorized local test, `script/prepare_debug_game_copy.py`
 creates an independent copy and adds debug permission to the copy's launcher.
 It requires the `--allow-debug-attach` flag, retains existing entitlements,

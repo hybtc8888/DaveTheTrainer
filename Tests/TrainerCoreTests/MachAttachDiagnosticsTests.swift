@@ -9,7 +9,7 @@ final class MachAttachDiagnosticsTests: XCTestCase {
         )
         XCTAssertTrue(detail.contains("管理员模式已启用"))
         XCTAssertTrue(detail.contains("get-task-allow"))
-        XCTAssertTrue(detail.contains("独立游戏副本"))
+        XCTAssertTrue(detail.contains("从 Steam 启动"))
         XCTAssertTrue(detail.contains("task_for_pid(42) failed"))
         XCTAssertFalse(detail.contains("请点击“管理员模式”"))
     }

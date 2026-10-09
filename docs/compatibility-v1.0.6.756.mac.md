@@ -157,3 +157,24 @@ elevation. A separately signed read-only probe also attached as the normal
 user, verified the exact build and loaded module UUID, and matched all 101
 expected code windows. No feature was enabled or game memory written. Full
 gameplay and real-save resource verification remain pending.
+
+## Steam Installation Setup
+
+The normal Steam launch workflow is the intended player route. A debug copy
+was used to isolate the attach restriction, not as a replacement for Steam
+launching. The opt-in Steam setup prepares a complete original backup and a
+reviewed signing payload while leaving the installation unchanged. It binds
+the source to the exact version, GUID and GameAssembly/metadata hashes.
+Application is separately authorized, changes only the launcher and resource
+signature, preserves existing entitlements, adds `get-task-allow`, verifies
+unchanged game assets and records applied hashes. Failed verification restores
+the original signing files. Restore refuses a changed Steam installation.
+
+Generated signed native fixtures exercised preparation, explicit-authorization
+refusal, intervening update refusal, failed verification rollback, entitlement
+retention and constrained application, stale restore refusal, exact/idempotent
+restoration without the prepared payload, and running-target refusal. The
+committed Python unittest repeats the file/signature checks and uses a mocked
+process listing for its running-target guard. No proprietary fixtures are used.
+The actual Steam original is backed up and prepared; signing it awaits explicit
+authorization. Direct Steam launch and live feature writes remain pending.
