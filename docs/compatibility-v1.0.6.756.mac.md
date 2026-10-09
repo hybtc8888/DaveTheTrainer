@@ -176,5 +176,8 @@ retention and constrained application, stale restore refusal, exact/idempotent
 restoration without the prepared payload, and running-target refusal. The
 committed Python unittest repeats the file/signature checks and uses a mocked
 process listing for its running-target guard. No proprietary fixtures are used.
-The actual Steam original is backed up and prepared; signing it awaits explicit
-authorization. Direct Steam launch and live feature writes remain pending.
+The actual Steam original was fully backed up and, with explicit authorization
+on 2026-10-09, received the reviewed debug entitlement. Strict signature
+verification passes; the full file manifest confirms that only the launcher
+and resource signature changed, with existing entitlements retained. Direct
+Steam launch and live feature writes remain pending.
